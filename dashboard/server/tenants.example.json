@@ -1,0 +1,12 @@
+[
+  {
+    "name": "Nassau County",
+    "code": "NC",
+    "region": "Long Island, NY",
+    "market": "Metro New York",
+    "state": "NY",
+    "tenantId": "REPLACE_WITH_NASSAU_TENANT_ID",
+    "clientId": "cid.REPLACE_WITH_CLIENT_ID",
+    "clientSecret": "cs1.REPLACE_WITH_REAL_SECRET"
+  }
+]

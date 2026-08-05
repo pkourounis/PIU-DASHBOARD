@@ -1,0 +1,6 @@
+/site/
+/node_modules/
+/.netlify/
+.env
+tenants.json
+/data/

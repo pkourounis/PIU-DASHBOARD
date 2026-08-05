@@ -1,0 +1,10 @@
+{
+  "name": "piu-dashboard",
+  "private": true,
+  "type": "module",
+  "description": "PatchitUP Nassau County technician leaderboard dashboard + ServiceTitan live-data functions.",
+  "dependencies": {
+    "@netlify/blobs": "^10.0.0",
+    "@netlify/functions": "^5.0.0"
+  }
+}
