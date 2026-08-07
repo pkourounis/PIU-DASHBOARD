@@ -266,6 +266,9 @@
     const sel=$("#locSel");
     if(sel){ if(mode==='supabase' && supaLocations.length>1){ sel.style.display=''; sel.innerHTML=supaLocations.map(l=>`<option value="${l.id}" ${l.id===currentLocationId?'selected':''}>${esc(l.name)}</option>`).join(''); } else sel.style.display='none'; }
     const so=$("#signout"); if(so) so.style.display = mode==='supabase' ? 'grid':'none';
+    let adminLink=$("#adminLink");
+    if(mode==='supabase'){ if(!adminLink && so){ adminLink=document.createElement('a'); adminLink.id='adminLink'; adminLink.href='admin.html'; adminLink.textContent='Admin'; adminLink.className='iconbtn'; adminLink.title='Admin console'; adminLink.style.cssText='width:auto;padding:0 13px;text-decoration:none;display:grid;place-items:center;font-weight:800;font-size:12.5px'; so.parentNode.insertBefore(adminLink, so); } if(adminLink) adminLink.style.display='grid'; }
+    else if(adminLink) adminLink.style.display='none';
     const badge=$("#roleBadge"); if(badge){ if(mode==='supabase'&&profile){ badge.style.display=''; badge.textContent = profile.role==='super_admin'?'Super Admin':'Franchisee'; } else badge.style.display='none'; }
   }
   $("#prev").addEventListener("click",()=>go(idx-1));
