@@ -3,7 +3,7 @@
 # index.html, plus the brand assets it references. The former corporate board
 # (dashboard/index.html) is kept in-repo for reference but is no longer served.
 [build]
-  command = "mkdir -p site/assets && cp dashboard/technician-dashboard.html site/index.html && cp dashboard/assets/* site/assets/"
+  command = "mkdir -p site/assets site/vendor && cp dashboard/technician-dashboard.html site/index.html && cp dashboard/app.js dashboard/supabase-config.js site/ && cp dashboard/assets/* site/assets/ && cp dashboard/vendor/* site/vendor/"
   publish = "site"
 
 [functions]

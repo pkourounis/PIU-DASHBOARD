@@ -329,9 +329,29 @@
 
   .foot-note{text-align:center; color:var(--ink-3); font-size:11.5px; font-weight:600; margin-top:2px}
 
-  /* technician photo fills avatar / leaderboard avatar (ServiceTitan headshot) */
+  /* technician photo fills avatar / leaderboard avatar */
   .avatar .ava-photo{width:100%;height:100%;border-radius:50%;object-fit:cover;display:block}
   .lb-av .ava-photo{position:absolute;inset:0;width:100%;height:100%;border-radius:50%;object-fit:cover}
+  /* role badge + sign-out */
+  .role-badge{display:inline-flex;align-items:center;font-size:11px;font-weight:800;letter-spacing:var(--ls-wide);text-transform:uppercase;color:var(--brand-deep);background:var(--blue-50);border:1px solid var(--border);padding:6px 11px;border-radius:var(--radius-pill)}
+  /* login overlay */
+  .login-overlay{position:fixed;inset:0;z-index:50;display:grid;place-items:center;background:color-mix(in srgb,var(--bg) 82%,transparent);backdrop-filter:blur(6px);padding:18px}
+  .login-overlay[hidden]{display:none}
+  .login-card{width:min(400px,94vw);background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-lg);padding:32px 30px;text-align:center}
+  .login-logo{height:38px;width:auto}
+  .login-card h1{font-size:20px;margin:12px 0 2px;letter-spacing:-.02em}
+  .login-sub{color:var(--ink-3);font-size:13px;font-weight:600;margin:0 0 18px}
+  .login-tabs{display:inline-flex;background:var(--panel-2);border:1px solid var(--border);border-radius:var(--radius-pill);padding:3px;margin-bottom:14px}
+  .login-tabs button{border:0;background:transparent;color:var(--ink-2);font-family:inherit;font-weight:700;font-size:12.5px;padding:6px 14px;border-radius:var(--radius-pill);cursor:pointer}
+  .login-tabs button.on{background:var(--panel);color:var(--brand-deep);box-shadow:var(--shadow)}
+  #loginForm{display:flex;flex-direction:column;gap:10px}
+  #loginForm input{font-family:inherit;font-size:14px;padding:11px 14px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--panel-2);color:var(--ink)}
+  #loginForm input:focus{outline:none;border-color:var(--brand);box-shadow:var(--ring-brand)}
+  .login-btn{background:var(--gradient-brand);color:#fff;border:0;font-weight:800;font-size:14px;padding:12px;border-radius:var(--radius-sm);cursor:pointer;font-family:inherit}
+  .login-btn:disabled{opacity:.6;cursor:default}
+  .login-msg{min-height:18px;font-size:12.5px;font-weight:700;margin-top:10px}
+  .login-demo{margin-top:14px;background:none;border:0;color:var(--ink-3);font-weight:700;font-size:12.5px;cursor:pointer;font-family:inherit;text-decoration:underline}
+  .login-demo:hover{color:var(--brand)}
 </style>
 
 <div class="app">
@@ -345,6 +365,7 @@
     <select class="range" id="locSel" style="display:none"></select>
     <div class="spacer"></div>
     <div class="controls">
+      <span class="role-badge" id="roleBadge" style="display:none">Franchisee</span>
       <select class="range" id="range">
         <option value="week">This Week</option>
         <option value="month" selected>This Month</option>
@@ -356,6 +377,7 @@
         <button data-mode="interactive">☱ Interactive</button>
       </div>
       <span class="clock" id="clock">—</span>
+      <button class="iconbtn" id="signout" title="Sign out" style="display:none">⎋</button>
       <button class="iconbtn" id="theme" title="Toggle theme">◑</button>
     </div>
   </div>
@@ -373,416 +395,26 @@
   <div class="foot-note">Revenue, Sales, Conversion &amp; Opp Job Average pull live from ServiceTitan; title, DISC letter, goals &amp; reviews are set in admin.</div>
 </div>
 
-<script>
-(function(){
-  "use strict";
+<div class="login-overlay" id="loginOverlay" hidden>
+  <div class="login-card">
+    <img class="login-logo logo-light" src="assets/patchitup-wordmark-color.webp" alt="PatchitUP" />
+    <img class="login-logo logo-dark" src="assets/patchitup-wordmark-white.png" alt="PatchitUP" />
+    <h1>Technician Dashboard</h1>
+    <p class="login-sub">Sign in to view your location.</p>
+    <div class="login-tabs" id="loginTabs">
+      <button data-tab="magic" class="on">Email link</button>
+      <button data-tab="password">Password</button>
+    </div>
+    <form id="loginForm">
+      <input type="email" id="loginEmail" placeholder="you@company.com" autocomplete="email" required />
+      <input type="password" id="loginPassword" placeholder="Password" autocomplete="current-password" style="display:none" />
+      <button type="submit" class="login-btn" id="loginSubmit">Send magic link</button>
+    </form>
+    <div class="login-msg" id="loginMsg"></div>
+    <button class="login-demo" id="loginDemo">View sample dashboard →</button>
+  </div>
+</div>
 
-  /* =====================================================================
-     PatchitUP — Location Technician Dashboard (front-end)
-     Data seam: LIVE ServiceTitan (via /api/*) or in-page SAMPLE fallback.
-     Admin-entered fields (title, DISC letter, goals, reviews) come from the
-     OVERLAY layer below — a local config now, swappable to Supabase later
-     with no UI changes (see DataLayer.loadOverlay).
-     ===================================================================== */
-
-  // ---- optional runtime config (set window.PIU_CONFIG = {apiBase} to point elsewhere)
-  const CFG = (typeof window!=='undefined' && window.PIU_CONFIG) || {};
-
-  // ===================== OVERLAY (admin data → Supabase later) ===========
-  // Keyed by ServiceTitan tenant id (string). Per-tech overrides key by
-  // technician id, falling back to exact name. `_default` fills any gap.
-  const OVERLAY = {
-    _default: {
-      goals: {
-        revenue:     { target: 350000 },
-        close:       { target: 0.65 },
-        reviews:     { actual: 0, target: 60, rating: null, total: null },
-        memberships: { actual: 0, target: 35 },
-        cancellations: 0,
-      },
-      techMeta: { title: 'Technician', disc: null },
-    },
-    byTenant: {
-      // Example — fill in once the live Nassau tenant id + roster are known:
-      // '123456': { goals:{...}, techs:{ 'Marcus Reyes': {title:'Lead Technician', disc:'D'} } }
-    },
-  };
-
-  // ===================== SAMPLE (demo when no live backend) ==============
-  const SAMPLE_TECHS = [
-    {id:'s1', name:"Marcus Reyes",  title:"Lead Technician",   disc:"D", revenue:48200, sales:41500, conv:0.68, oja:642, opps:75, converted:51, hours:168, salesHr:247},
-    {id:'s2', name:"Danielle Cho",  title:"Senior Technician", disc:"I", revenue:43900, sales:39800, conv:0.64, oja:585, opps:75, converted:48, hours:171, salesHr:233},
-    {id:'s3', name:"Andre Willis",  title:"Lead Technician",   disc:"D", revenue:41250, sales:36400, conv:0.66, oja:604, opps:68, converted:45, hours:160, salesHr:228},
-    {id:'s4', name:"Sofia Marino",  title:"Technician",        disc:"C", revenue:37800, sales:34100, conv:0.71, oja:559, opps:68, converted:48, hours:166, salesHr:205},
-    {id:'s5', name:"Priya Nair",    title:"Technician",        disc:"I", revenue:34600, sales:31900, conv:0.62, oja:548, opps:63, converted:39, hours:158, salesHr:202},
-    {id:'s6', name:"Tyrone Jackson",title:"Technician",        disc:"S", revenue:31200, sales:28400, conv:0.59, oja:520, opps:60, converted:35, hours:162, salesHr:175},
-    {id:'s7', name:"Luis Fernández",title:"Technician",        disc:"C", revenue:27950, sales:25100, conv:0.57, oja:498, opps:56, converted:32, hours:150, salesHr:167},
-    {id:'s8', name:"Kevin O'Brien", title:"Apprentice",        disc:"S", revenue:19400, sales:17200, conv:0.51, oja:441, opps:44, converted:22, hours:139, salesHr:124},
-  ];
-  const SAMPLE_GOALS = {
-    revenue:{actual:312400, target:350000},
-    close:{actual:0.63, target:0.65},
-    reviews:{actual:47, target:60, rating:4.8, total:326},
-    memberships:{actual:28, target:35},
-    cancellations:11,
-  };
-
-  // ===================== helpers ========================================
-  const $ = (s,r=document)=>r.querySelector(s);
-  const usd  = n => "$"+Math.round(n||0).toLocaleString("en-US");
-  const usdK = n => n>=1000 ? "$"+(n/1000).toFixed(n>=10000?0:1)+"k" : "$"+Math.round(n||0);
-  const pct  = n => Math.round((n||0)*100)+"%";
-  const initials = name => (name||"?").split(/\s+/).map(w=>w[0]).slice(0,2).join("").toUpperCase();
-  const ordinal = n => n+(["th","st","nd","rd"][(n%100>10&&n%100<14)?0:(n%10<4?n%10:0)]);
-  const medals = ["🥇","🥈","🥉"];
-  const clampPct = r => Math.max(0, Math.min(100, Math.round((r||0)*100)));
-  const DISC = {
-    D:{word:"Dominance",     v:"var(--disc-d)"},
-    I:{word:"Influence",     v:"var(--disc-i)"},
-    S:{word:"Steadiness",    v:"var(--disc-s)"},
-    C:{word:"Conscientious", v:"var(--disc-c)"},
-  };
-  const LB_METRICS = [
-    {key:"revenue", label:"Revenue",    fmt:usd},
-    {key:"sales",   label:"Sales",      fmt:usd},
-    {key:"conv",    label:"Conversion", fmt:pct},
-    {key:"oja",     label:"Opp Job Avg",fmt:usd},
-  ];
-  const MASCOT = "assets/patchitup-mascot.png";
-
-  // date-range → [fromISO, toISO] as 'YYYY-MM-DD' (inclusive), based on today.
-  const iso = d => d.toISOString().slice(0,10);
-  function rangeBounds(key){
-    const now = new Date();
-    const y = now.getUTCFullYear(), m = now.getUTCMonth(), d = now.getUTCDate();
-    const to = iso(now); let from;
-    if(key==='week'){ const dow=(now.getUTCDay()+6)%7; const s=new Date(Date.UTC(y,m,d-dow)); from=iso(s); }
-    else if(key==='quarter'){ const qm=Math.floor(m/3)*3; from=iso(new Date(Date.UTC(y,qm,1))); }
-    else if(key==='ytd'){ from=iso(new Date(Date.UTC(y,0,1))); }
-    else { from=iso(new Date(Date.UTC(y,m,1))); }   // month (default)
-    return [from, to];
-  }
-  const MONTHS=["January","February","March","April","May","June","July","August","September","October","November","December"];
-  function periodLabel(key){
-    const now=new Date(), y=now.getUTCFullYear();
-    if(key==='week') return "This Week";
-    if(key==='quarter') return "Q"+(Math.floor(now.getUTCMonth()/3)+1)+" "+y;
-    if(key==='ytd') return y+" YTD";
-    return MONTHS[now.getUTCMonth()]+" "+y;
-  }
-
-  // ===================== state ==========================================
-  let techs = [], teamAvg = {}, location = {};
-  let range = 'month';
-
-  // ===================== DataLayer / Adapter ============================
-  // Mirrors the proven adapter contract: /api/health decides live vs sample;
-  // /api/locations + per-tenant /tech-daily feed the KPI math. Only the very
-  // first load may fall back to sample; refreshes keep the last good data.
-  const Adapter = {
-    mode:'sample', apiBase:'', locations:[], currentTenant:null,
-    techDaily:new Map(),   // tenant -> { roster, daily }
-    async init(){
-      this.apiBase = String(CFG.apiBase!=null?CFG.apiBase:'').replace(/\/$/,'');
-      try{ const h=await fetch(this.apiBase+'/api/health',{cache:'no-store'});
-        if(h.ok){ const j=await h.json().catch(()=>null); if(j&&j.ok) this.mode='live'; } }catch(_){}
-      if(this.mode==='live') await this.preload({initial:true});
-      if(this.mode!=='live'){ this.locations=[{name:'Nassau County', tenant:'sample'}]; this.currentTenant='sample'; }
-    },
-    async preload({initial=false}={}){
-      try{
-        const locs = await (await fetch(this.apiBase+'/api/locations',{cache:'no-store'})).json();
-        if(!Array.isArray(locs)||!locs.length) throw new Error('no locations');
-        this.locations = locs.map(l=>({name:l.name, tenant:String(l.tenant), code:l.code||'', region:l.region||''}));
-        if(!this.currentTenant) this.currentTenant=this.locations[0].tenant;
-        await Promise.all(this.locations.map(async l=>{
-          try{ const td=await (await fetch(`${this.apiBase}/api/locations/${l.tenant}/tech-daily`)).json();
-            if(td&&td.daily&&Object.keys(td.daily).length) this.techDaily.set(l.tenant, td); }catch(_){}
-        }));
-      }catch(_){ if(initial) this.mode='sample'; }
-    },
-    async refresh(){ if(this.mode==='live') await this.preload({initial:false}); },
-  };
-
-  function overlayFor(tenant){ return (OVERLAY.byTenant[tenant]) || OVERLAY._default; }
-  function techMeta(tenant, id, rosterName){
-    const ov = overlayFor(tenant);
-    const t = (ov.techs && (ov.techs[id] || ov.techs[rosterName])) || {};
-    return { title: t.title || OVERLAY._default.techMeta.title, disc: t.disc || OVERLAY._default.techMeta.disc };
-  }
-  function goalsFor(tenant){
-    const ov = overlayFor(tenant).goals || {};
-    const d = OVERLAY._default.goals;
-    return {
-      revenue:{ target:(ov.revenue&&ov.revenue.target)||d.revenue.target },
-      close:{ target:(ov.close&&ov.close.target)||d.close.target },
-      reviews:{ actual:(ov.reviews&&ov.reviews.actual)||d.reviews.actual, target:(ov.reviews&&ov.reviews.target)||d.reviews.target,
-                rating:(ov.reviews&&ov.reviews.rating)||d.reviews.rating, total:(ov.reviews&&ov.reviews.total)||d.reviews.total },
-      memberships:{ actual:(ov.memberships&&ov.memberships.actual)||d.memberships.actual, target:(ov.memberships&&ov.memberships.target)||d.memberships.target },
-      cancellations: ov.cancellations!=null?ov.cancellations:d.cancellations,
-    };
-  }
-
-  // Total tech-daily rows [opps,converted,options,sales,pipeline,hours,jobs,completedRevenue]
-  // over the selected date range → per-tech KPI objects.
-  function computeTechsLive(tenant){
-    const td = Adapter.techDaily.get(tenant);
-    if(!td) return [];
-    const [from,to] = rangeBounds(range);
-    const tot = {};
-    for(const day in td.daily){
-      if(day<from || day>to) continue;
-      const m = td.daily[day];
-      for(const id in m){
-        const row=m[id]; const s = tot[id] || (tot[id]=[0,0,0,0,0,0,0,0]);
-        for(let i=0;i<8;i++) s[i]+=row[i]||0;
-      }
-    }
-    return Object.keys(tot).map(id=>{
-      const s=tot[id]; const opps=s[0],converted=s[1],sales=s[3],hours=s[5],revenue=s[7];
-      const rosterName=(td.roster[id]&&td.roster[id].name)||('Technician '+id);
-      const meta=techMeta(tenant,id,rosterName);
-      return { id, name:rosterName, photo:(td.roster[id]&&td.roster[id].photo)||null,
-        title:meta.title, disc:meta.disc,
-        revenue, sales, conv:opps?converted/opps:0, oja:opps?revenue/opps:0,
-        opps, converted, hours:Math.round(hours), salesHr:hours?sales/hours:0 };
-    }).filter(t=>t.id!=='unassigned' && (t.opps>0||t.revenue>0||t.sales>0))
-      .sort((a,b)=>b.revenue-a.revenue);
-  }
-
-  function computeTeamAvg(){
-    const n=techs.length||1;
-    const sum=k=>techs.reduce((a,t)=>a+(t[k]||0),0);
-    teamAvg = { revenue:sum('revenue')/n, sales:sum('sales')/n, conv:sum('conv')/n, oja:sum('oja')/n };
-  }
-  function rankOf(tech,key){ return [...techs].sort((a,b)=>b[key]-a[key]).indexOf(tech)+1; }
-
-  function buildLocation(){
-    const tenant=Adapter.currentTenant;
-    const name=(Adapter.locations.find(l=>l.tenant===tenant)||{}).name||'Location';
-    if(Adapter.mode!=='live' || tenant==='sample'){
-      const g=SAMPLE_GOALS;
-      location = { name, period:periodLabel(range),
-        goals:{ revenue:{...g.revenue}, close:{...g.close}, reviews:{...g.reviews} },
-        context:{ opportunities:509, oppJobAvg:551, memberships:g.memberships.actual, membershipsTarget:g.memberships.target, cancellations:g.cancellations } };
-      return;
-    }
-    const g=goalsFor(tenant);
-    const totRev=techs.reduce((a,t)=>a+t.revenue,0);
-    const totOpps=techs.reduce((a,t)=>a+t.opps,0);
-    const totConv=techs.reduce((a,t)=>a+t.converted,0);
-    const close=totOpps?totConv/totOpps:0;
-    location = { name, period:periodLabel(range),
-      goals:{ revenue:{actual:totRev, target:g.revenue.target},
-              close:{actual:close, target:g.close.target},
-              reviews:{...g.reviews} },
-      context:{ opportunities:totOpps, oppJobAvg:totOpps?totRev/totOpps:0,
-                memberships:g.memberships.actual, membershipsTarget:g.memberships.target, cancellations:g.cancellations } };
-  }
-
-  function loadData(){
-    if(Adapter.mode==='live' && Adapter.currentTenant && Adapter.currentTenant!=='sample'){
-      techs = computeTechsLive(Adapter.currentTenant);
-      if(!techs.length){ techs = SAMPLE_TECHS.map(t=>({...t})); }  // no rows in range → show demo rather than blank
-    } else {
-      techs = SAMPLE_TECHS.map(t=>({...t}));
-    }
-    computeTeamAvg();
-    buildLocation();
-    buildSlides();
-    paint();
-    updateChrome();
-  }
-
-  // ===================== render: technician scorecard ===================
-  function metricTile(label, valueHtml, techVal, teamVal, fmt){
-    const max=Math.max(techVal,teamVal)*1.15||1;
-    const fillPct=Math.min(100,techVal/max*100), tickPct=Math.min(100,teamVal/max*100);
-    const diff=teamVal?(techVal-teamVal)/teamVal:0;
-    const dcls=diff>0.01?"up":diff<-0.01?"down":"flat";
-    const arrow=diff>0.01?"▲":diff<-0.01?"▼":"–";
-    return `<div class="mtile">
-      <div class="lbl">${label}</div>
-      <div class="val">${valueHtml}</div>
-      <div class="delta ${dcls}">${arrow} ${(diff>0?"+":"")+Math.round(diff*100)}% vs team avg</div>
-      <div class="cmp"><i style="width:${fillPct}%"></i><span style="left:${tickPct}%"></span></div>
-      <div class="cmp-note">Team avg ${fmt(teamVal)}</div>
-    </div>`;
-  }
-  function avatarInner(tech){
-    return tech.photo ? `<img class="ava-photo" src="${tech.photo}" alt="${tech.name}"/>` : initials(tech.name);
-  }
-  function renderTech(tech){
-    const d=DISC[tech.disc]||{word:"—",v:"var(--brand)"};
-    const rk=rankOf(tech,"revenue"); const podium=rk<=3;
-    return `<div class="slide" style="--disc-color:${d.v}">
-      <div class="rank-corner ${podium?"podium":""}">
-        ${podium?`<div class="medal">${medals[rk-1]}</div>`:""}
-        <div class="rc-txt"><span class="rk">${ordinal(rk)}<small>/${techs.length}</small></span><span class="cap">Revenue Rank</span></div>
-      </div>
-      <div class="slide-head tech-head"><p class="eyebrow">Technician Scorecard · ${location.name} · ${location.period}</p></div>
-      <div class="tech-grid">
-        <div class="profile">
-          <div class="avatar">${avatarInner(tech)}</div>
-          <div class="p-id">
-            <div class="p-name">${tech.name}</div>
-            <div class="p-title">${tech.title}</div>
-            ${tech.disc?`<div class="disc-badge"><span class="letter">${tech.disc}</span> ${d.word}</div>`:``}
-          </div>
-          <div class="rank-pill">Revenue rank <b>#${rk}</b> of ${techs.length}</div>
-        </div>
-        <div>
-          <div class="metrics">
-            ${metricTile("Revenue", usd(tech.revenue), tech.revenue, teamAvg.revenue, usdK)}
-            ${metricTile("Sales", usd(tech.sales), tech.sales, teamAvg.sales, usdK)}
-            ${metricTile("Opportunity Conversion", pct(tech.conv), tech.conv, teamAvg.conv, pct)}
-            ${metricTile("Opp Job Average", usd(tech.oja), tech.oja, teamAvg.oja, usd)}
-          </div>
-          <div class="subchips">
-            <div class="chip"><span class="k">Opportunities</span><span class="v">${tech.opps}</span></div>
-            <div class="chip"><span class="k">Converted</span><span class="v">${tech.converted}</span></div>
-            <div class="chip"><span class="k">Labor Hours</span><span class="v">${tech.hours}</span></div>
-            <div class="chip"><span class="k">Sales / Hour</span><span class="v">${usd(tech.salesHr)}</span></div>
-          </div>
-        </div>
-      </div>
-    </div>`;
-  }
-
-  // ===================== render: leaderboard ============================
-  function renderLeaderboard(lbMetric){
-    const m=LB_METRICS.find(x=>x.key===lbMetric)||LB_METRICS[0];
-    const sorted=[...techs].sort((a,b)=>b[m.key]-a[m.key]);
-    const header=`<div class="lbcols lb-head">
-      <div class="h">#</div><div class="h">Technician</div>
-      ${LB_METRICS.map(x=>`<button class="h num ${x.key===lbMetric?"active":""}" data-k="${x.key}">${x.label}${x.key===lbMetric?' <span class="caret">▼</span>':''}</button>`).join("")}
-    </div>`;
-    const rows=sorted.map((t,i)=>{
-      const cells=LB_METRICS.map(x=>`<div class="lbcell ${x.key===lbMetric?"active":""}"><span class="num">${x.fmt(t[x.key])}</span></div>`).join("");
-      return `<div class="lbcols lb-row2 ${i<3?"top":""}" style="--disc-color:${(DISC[t.disc]||{}).v||'transparent'}">
-        <div class="lb-rank">${i<3?`<span class="medal">${medals[i]}</span>`:(i+1)}</div>
-        <div class="lb-id"><div class="lb-av">${t.photo?`<img class="ava-photo" src="${t.photo}" alt=""/>`:initials(t.name)}</div>
-          <div style="min-width:0"><div class="lb-name">${t.name}</div><div class="lb-title">${t.title}${t.disc?` · DISC ${t.disc}`:''}</div></div></div>
-        ${cells}
-      </div>`;
-    }).join("");
-    return `<div class="slide">
-      <div class="slide-head"><div><p class="eyebrow">Team Leaderboard</p><h2>Ranked by ${m.label}</h2>
-        <div class="slide-sub">${location.name} · ${location.period} · ${techs.length} technicians</div></div>
-        <div class="lb-hint">Tap a metric to re-rank →</div></div>
-      <div class="lb-scroll"><div class="lb-table" id="lbTable">${header}${rows}</div></div>
-    </div>`;
-  }
-
-  // ===================== render: company goals ==========================
-  function statusOf(r){ if(r>=1) return {cls:"good",txt:"Goal met",ic:"✓"}; if(r>=0.85) return {cls:"warn",txt:"On pace",ic:"→"}; return {cls:"bad",txt:"Behind",ic:"!"}; }
-  function ringGoal(lbl,valHtml,tgtHtml,ratio,gold){
-    const s=statusOf(ratio), p=clampPct(ratio);
-    return `<div class="goal"><div class="ring ${gold?"gold":""}" style="--p:${p}"><span class="ring-txt">${p}%</span></div>
-      <div class="g-body"><div class="g-lbl">${lbl}</div><div class="g-val">${valHtml}</div><div class="g-tgt">Target ${tgtHtml}</div>
-      <span class="status ${s.cls}">${s.ic} ${s.txt}</span></div></div>`;
-  }
-  function reviewsGoal(r){
-    const ratio=r.target?r.actual/r.target:0, p=clampPct(ratio), s=statusOf(ratio);
-    const stars = r.rating!=null
-      ? `<span class="track"><span class="base">★★★★★</span><span class="fill" style="width:${(r.rating/5*100).toFixed(1)}%">★★★★★</span></span><span class="num">${r.rating.toFixed(1)}</span>${r.total!=null?`<span class="cnt">· ${r.total} total</span>`:''}`
-      : `<span class="cnt">rating not synced</span>`;
-    return `<div class="goal"><div class="ring gold" style="--p:${p}"><span class="ring-txt">${r.actual}</span></div>
-      <div class="g-body"><div class="g-lbl">Google Reviews · New This Period</div><div class="g-val">${r.actual}<small> / ${r.target}</small></div>
-      <div class="stars">${stars}</div><span class="status ${s.cls}">${s.ic} ${s.txt}</span></div></div>`;
-  }
-  function renderGoals(){
-    const g=location.goals, c=location.context;
-    const revFill=clampPct(g.revenue.actual/g.revenue.target);
-    const scaleMax=Math.max(g.revenue.actual,g.revenue.target)*1.08||1;
-    const revTick=Math.min(100,g.revenue.target/scaleMax*100), revPos=Math.min(100,g.revenue.actual/scaleMax*100);
-    const memT=c.membershipsTarget||35;
-    return `<div class="slide">
-      <div class="slide-head"><div><p class="eyebrow">Company Goals</p><h2>${location.name}</h2>
-        <div class="slide-sub">${location.period} · progress to targets</div></div>
-        <img class="goals-mascot" src="${MASCOT}" alt="PatchitUP"/></div>
-      <div class="goals-wrap">
-        <div class="g-hero">
-          <div><div class="h-lbl">Revenue to Goal</div><div class="h-val">${usd(g.revenue.actual)}</div>
-            <div class="h-tgt">of ${usd(g.revenue.target)} target · ${usd(Math.max(0,g.revenue.target-g.revenue.actual))} to go</div>
-            <div class="h-meter"><i style="width:${revPos}%"></i><span style="left:${revTick}%"></span></div></div>
-          <div class="h-attain"><div class="big">${revFill}%</div><div class="cap">of goal</div></div>
-        </div>
-        <div class="goals-grid">
-          ${ringGoal("Average Close Rate", pct(g.close.actual), pct(g.close.target), g.close.target?g.close.actual/g.close.target:0)}
-          ${reviewsGoal(g.reviews)}
-          ${ringGoal("Memberships Sold", c.memberships, memT, memT?c.memberships/memT:0, true)}
-        </div>
-        <div class="ctx-strip">
-          <div class="ctx"><span class="k">Opportunities</span><span class="v">${c.opportunities}</span></div>
-          <div class="ctx"><span class="k">Opp Job Avg</span><span class="v">${usd(c.oppJobAvg)}</span></div>
-          <div class="ctx"><span class="k">Avg Close Rate</span><span class="v">${pct(g.close.actual)}</span></div>
-          <div class="ctx"><span class="k">Cancellations</span><span class="v">${c.cancellations}</span></div>
-        </div>
-      </div>
-    </div>`;
-  }
-
-  // ===================== slides + kiosk controller ======================
-  let slides=[], idx=0;
-  const stage=$("#stage"), dotsEl=$("#dots"), nowLabel=$("#nowLabel");
-  const progFill=$("#progress").firstElementChild;
-
-  function buildSlides(){
-    slides=[
-      {type:"goals", label:"Company Goals", render:renderGoals},
-      ...techs.map(t=>({type:"tech", label:(t.name||"").split(" ")[0], render:()=>renderTech(t)})),
-      ...LB_METRICS.map(m=>({type:"lb", metric:m.key, label:`Leaders · ${m.label}`, render(){return renderLeaderboard(this.metric);}})),
-    ];
-    if(idx>=slides.length) idx=0;
-    dotsEl.innerHTML=slides.map((s,i)=>`<button data-i="${i}" class="${s.type} ${i===idx?"on":""}" title="${s.label}"></button>`).join("");
-  }
-  function paint(){
-    stage.innerHTML=slides[idx].render();
-    [...dotsEl.children].forEach((b,i)=>b.classList.toggle("on",i===idx));
-    nowLabel.textContent = slides[idx].type==="tech" ? `Scorecard · ${slides[idx].label}` : slides[idx].label;
-    if(slides[idx].type==="lb"){ const tbl=$("#lbTable"); tbl&&tbl.addEventListener("click",e=>{ const b=e.target.closest("button.h"); if(!b)return; slides[idx].metric=b.dataset.k; paint(); restart(); }); }
-  }
-  function go(n){ idx=(n+slides.length)%slides.length; paint(); restart(); }
-
-  const DWELL={goals:13000, tech:7000, lb:6000};
-  const dwellFor=()=>DWELL[slides[idx].type]||8000;
-  let mode="kiosk", playing=true, t0=0, raf=0;
-  function frame(ts){ if(!t0)t0=ts; const p=Math.min(1,(ts-t0)/dwellFor()); progFill.style.width=(p*100)+"%"; if(p>=1){t0=0;go(idx+1);return;} raf=requestAnimationFrame(frame); }
-  function restart(){ cancelAnimationFrame(raf); t0=0; progFill.style.width="0%"; if(mode==="kiosk"&&playing) raf=requestAnimationFrame(frame); }
-  function setPlaying(p){ playing=p; $("#play").textContent=p?"❚❚":"▶"; restart(); }
-  function setMode(m){ mode=m; [...$("#mode").children].forEach(b=>b.classList.toggle("on",b.dataset.mode===m)); $("#progress").style.visibility=m==="kiosk"?"visible":"hidden"; $("#play").style.display=m==="kiosk"?"grid":"none"; restart(); }
-
-  // ===================== chrome: toolbar wiring =========================
-  function updateChrome(){
-    // location pill + live/sample dot
-    const pill=$("#locName"); if(pill) pill.textContent=location.name;
-    const dot=$("#liveDot"); if(dot){ dot.style.background=Adapter.mode==='live'?'var(--good)':'var(--ink-3)'; dot.title=Adapter.mode==='live'?'Live ServiceTitan data':'Sample data'; }
-    // location selector options (multi-location)
-    const sel=$("#locSel");
-    if(sel){ if(Adapter.locations.length>1){ sel.style.display=''; sel.innerHTML=Adapter.locations.map(l=>`<option value="${l.tenant}" ${l.tenant===Adapter.currentTenant?'selected':''}>${l.name}</option>`).join(''); } else { sel.style.display='none'; } }
-  }
-
-  $("#prev").addEventListener("click",()=>go(idx-1));
-  $("#next").addEventListener("click",()=>go(idx+1));
-  $("#play").addEventListener("click",()=>setPlaying(!playing));
-  dotsEl.addEventListener("click",e=>{ const b=e.target.closest("button"); if(b) go(+b.dataset.i); });
-  $("#mode").addEventListener("click",e=>{ const b=e.target.closest("button"); if(b) setMode(b.dataset.mode); });
-  $("#range").addEventListener("change",e=>{ range=e.target.value; loadData(); });
-  const locSel=$("#locSel"); locSel&&locSel.addEventListener("change",e=>{ Adapter.currentTenant=e.target.value; loadData(); });
-  document.addEventListener("keydown",e=>{ if(e.key==="ArrowRight")go(idx+1); else if(e.key==="ArrowLeft")go(idx-1); else if(e.key===" "){e.preventDefault();setPlaying(!playing);} });
-  $(".stage").addEventListener("mouseenter",()=>{ if(mode==="kiosk")cancelAnimationFrame(raf); });
-  $(".stage").addEventListener("mouseleave",()=>{ if(mode==="kiosk"&&playing)restart(); });
-  $("#theme").addEventListener("click",()=>{ const cur=document.documentElement.getAttribute("data-theme"); const sysDark=window.matchMedia("(prefers-color-scheme: dark)").matches; document.documentElement.setAttribute("data-theme", cur?(cur==="dark"?"light":"dark"):(sysDark?"light":"dark")); });
-  function tick(){ const el=$("#clock"); if(el) el.textContent=new Date().toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"}); }
-  setInterval(tick,1000); tick();
-
-  // periodic live refresh (kept live; never downgrades to sample)
-  setInterval(()=>{ if(Adapter.mode==='live') Adapter.refresh().then(loadData).catch(()=>{}); }, 15*60*1000);
-
-  // ===================== boot ===========================================
-  setMode("kiosk");
-  Adapter.init().then(loadData).catch(loadData);
-})();
-
-</script>
+<script src="vendor/supabase.js"></script>
+<script src="supabase-config.js"></script>
+<script src="app.js"></script>
