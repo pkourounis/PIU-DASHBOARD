@@ -1,0 +1,788 @@
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>PatchitUP · Technician Dashboard</title>
+<style>
+  :root{
+    /* PatchitUP design system (inherited from dashboard/index.html) */
+    --blue-50:#eaf3fc; --blue-100:#d6e6f8; --blue-200:#b6d3f1;
+    --blue-400:#4B90D0; --blue-500:#2A7DD1; --blue-600:#2368b4;
+    --blue-700:#1b5391; --blue-900:#104679; --blue-950:#0C3155;
+    --steel-500:#7E8488; --steel-300:#aeb4b8;
+
+    --brand:var(--blue-500); --brand-deep:var(--blue-950);
+    --gradient-brand:linear-gradient(158deg,#4B90D0 0%,#1b5391 55%,#0C3155 100%);
+
+    --bg:#eaf1f8; --panel:#ffffff; --panel-2:#f2f7fc;
+    --ink:#0f2233; --ink-2:#4a5a6a; --ink-3:#7E8488;
+    --border:#dae7f2; --border-2:#e9f1f8;
+    --good:#1f9d63; --good-wash:#e6f5ee; --bad:#d6543f; --bad-wash:#fbeae6;
+    --warn:#c98a12; --warn-wash:#fbf1dc;
+    --bar:#4B90D0; --bar-soft:#cfe2f4; --bar-hi:#2368b4; --trend:#0c3155;
+
+    /* DISC language */
+    --disc-d:#d6543f; --disc-i:#d99413; --disc-s:#1f9d63; --disc-c:#2A7DD1;
+
+    --radius:18px; --radius-sm:12px; --radius-pill:999px;
+    --shadow:0 1px 2px rgba(12,49,85,.06), 0 10px 26px rgba(12,49,85,.10);
+    --shadow-lg:0 2px 6px rgba(12,49,85,.08), 0 18px 44px rgba(12,49,85,.16);
+    --ring-brand:0 0 0 3px rgba(42,125,209,.4);
+    --font:"Fira Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --ls-wide:.10em; --ls-wider:.14em;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --brand:#4a97dc; --brand-deep:#bfdcf5; --blue-50:#18304a;
+      --gradient-brand:linear-gradient(158deg,#2f6aa8 0%,#123a63 55%,#0a2947 100%);
+      --bg:#0a1622; --panel:#10202f; --panel-2:#16293b;
+      --ink:#e8f0f8; --ink-2:#9fb2c4; --ink-3:#7E8488;
+      --border:#23374a; --border-2:#1c2c3d;
+      --good:#35bd80; --good-wash:#12261d; --bad:#f0705c; --bad-wash:#2a1512;
+      --warn:#e6a53a; --warn-wash:#2a2210;
+      --bar:#4f97d6; --bar-soft:#243a52; --bar-hi:#7bb8ea; --trend:#bfdcf5;
+      --disc-d:#f0705c; --disc-i:#e6a53a; --disc-s:#35bd80; --disc-c:#4f97d6;
+      --shadow:0 1px 2px rgba(0,0,0,.4), 0 12px 34px rgba(0,0,0,.4);
+      --shadow-lg:0 2px 6px rgba(0,0,0,.45), 0 20px 48px rgba(0,0,0,.5);
+      --ring-brand:0 0 0 3px rgba(79,151,214,.45);
+    }
+  }
+  :root[data-theme="light"]{
+    --brand:#2A7DD1; --brand-deep:#0C3155;
+    --gradient-brand:linear-gradient(158deg,#4B90D0 0%,#1b5391 55%,#0C3155 100%);
+    --bg:#eaf1f8; --panel:#fff; --panel-2:#f2f7fc; --ink:#0f2233; --ink-2:#4a5a6a; --ink-3:#7E8488;
+    --border:#dae7f2; --border-2:#e9f1f8; --good:#1f9d63; --good-wash:#e6f5ee; --bad:#d6543f; --bad-wash:#fbeae6;
+    --warn:#c98a12; --warn-wash:#fbf1dc;
+    --bar:#4B90D0; --bar-soft:#cfe2f4; --bar-hi:#2368b4; --trend:#0c3155;
+    --disc-d:#d6543f; --disc-i:#d99413; --disc-s:#1f9d63; --disc-c:#2A7DD1;
+    --shadow:0 1px 2px rgba(12,49,85,.06),0 10px 26px rgba(12,49,85,.10);
+    --shadow-lg:0 2px 6px rgba(12,49,85,.08),0 18px 44px rgba(12,49,85,.16);
+  }
+  :root[data-theme="dark"]{
+    --brand:#4a97dc; --brand-deep:#bfdcf5; --blue-50:#18304a;
+    --gradient-brand:linear-gradient(158deg,#2f6aa8 0%,#123a63 55%,#0a2947 100%);
+    --bg:#0a1622; --panel:#10202f; --panel-2:#16293b; --ink:#e8f0f8; --ink-2:#9fb2c4; --ink-3:#7E8488;
+    --border:#23374a; --border-2:#1c2c3d; --good:#35bd80; --good-wash:#12261d; --bad:#f0705c; --bad-wash:#2a1512;
+    --warn:#e6a53a; --warn-wash:#2a2210;
+    --bar:#4f97d6; --bar-soft:#243a52; --bar-hi:#7bb8ea; --trend:#bfdcf5;
+    --disc-d:#f0705c; --disc-i:#e6a53a; --disc-s:#35bd80; --disc-c:#4f97d6;
+    --shadow:0 1px 2px rgba(0,0,0,.4),0 12px 34px rgba(0,0,0,.4);
+    --shadow-lg:0 2px 6px rgba(0,0,0,.45),0 20px 48px rgba(0,0,0,.5);
+  }
+
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{
+    background:var(--bg); color:var(--ink); font-family:var(--font);
+    -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
+    min-height:100vh; padding:18px; display:flex; justify-content:center;
+  }
+  .app{width:100%; max-width:1320px; display:flex; flex-direction:column; gap:14px}
+
+  /* ── Top bar ─────────────────────────────────────────────── */
+  .topbar{
+    display:flex; align-items:center; gap:16px; flex-wrap:wrap;
+    background:var(--panel); border:1px solid var(--border); border-radius:var(--radius);
+    padding:12px 16px; box-shadow:var(--shadow);
+  }
+  .brand{display:flex; align-items:center; gap:12px; min-width:0}
+  .logo{
+    width:42px; height:42px; border-radius:11px; background:var(--gradient-brand);
+    display:grid; place-items:center; color:#fff; font-weight:800; font-size:19px;
+    letter-spacing:-.02em; box-shadow:var(--shadow); flex:none;
+  }
+  .logo-img{height:46px; width:auto; display:block; flex:none}
+  .logo-dark{display:none}
+  @media (prefers-color-scheme: dark){ .logo-light{display:none} .logo-dark{display:block} }
+  :root[data-theme="light"] .logo-light{display:block}
+  :root[data-theme="light"] .logo-dark{display:none}
+  :root[data-theme="dark"] .logo-light{display:none}
+  :root[data-theme="dark"] .logo-dark{display:block}
+  .dept{font-size:12px; color:var(--ink-3); font-weight:700; letter-spacing:var(--ls-wide); text-transform:uppercase; padding-left:2px; align-self:center}
+  .brand-txt{display:flex; flex-direction:column; line-height:1.15; min-width:0}
+  .brand-txt b{font-size:15px; letter-spacing:-.01em}
+  .brand-txt span{font-size:12px; color:var(--ink-3); font-weight:600; letter-spacing:var(--ls-wide); text-transform:uppercase}
+  .loc-pill{
+    display:inline-flex; align-items:center; gap:7px; font-weight:700; font-size:13.5px;
+    color:var(--brand-deep); background:var(--blue-50); border:1px solid var(--border);
+    padding:6px 12px; border-radius:var(--radius-pill);
+  }
+  .dot-live{width:8px;height:8px;border-radius:50%;background:var(--good);box-shadow:0 0 0 3px var(--good-wash)}
+  .spacer{flex:1 1 auto}
+  .controls{display:flex; align-items:center; gap:8px; flex-wrap:wrap}
+  .seg{display:inline-flex; background:var(--panel-2); border:1px solid var(--border); border-radius:var(--radius-pill); padding:3px}
+  .seg button{
+    border:0; background:transparent; color:var(--ink-2); font-family:inherit; font-weight:700;
+    font-size:12.5px; padding:6px 13px; border-radius:var(--radius-pill); cursor:pointer; letter-spacing:.01em;
+  }
+  .seg button.on{background:var(--panel); color:var(--brand-deep); box-shadow:var(--shadow)}
+  .iconbtn{
+    width:38px; height:38px; border-radius:11px; border:1px solid var(--border); background:var(--panel-2);
+    color:var(--ink-2); font-size:16px; cursor:pointer; display:grid; place-items:center; font-family:inherit;
+  }
+  .iconbtn:hover{color:var(--brand); border-color:var(--brand)}
+  .clock{font-weight:700; font-size:13px; color:var(--ink-2); font-variant-numeric:tabular-nums; white-space:nowrap}
+  select.range{
+    font-family:inherit; font-weight:700; font-size:12.5px; color:var(--ink); background:var(--panel-2);
+    border:1px solid var(--border); border-radius:var(--radius-pill); padding:7px 12px; cursor:pointer;
+  }
+
+  /* ── Stage ──────────────────────────────────────────────── */
+  .stage-wrap{position:relative}
+  .stage{
+    background:var(--panel); border:1px solid var(--border); border-radius:var(--radius);
+    box-shadow:var(--shadow-lg); overflow:hidden; min-height:600px;
+  }
+  .slide{padding:26px 30px 30px; animation:slidein .5s ease; position:relative}
+  @keyframes slidein{from{opacity:0; transform:translateY(10px)} to{opacity:1; transform:none}}
+  @media (prefers-reduced-motion: reduce){ .slide{animation:none} }
+
+  .slide-head{display:flex; align-items:flex-end; justify-content:space-between; gap:16px; margin-bottom:20px; flex-wrap:wrap}
+  .eyebrow{font-size:12px; font-weight:800; letter-spacing:var(--ls-wider); text-transform:uppercase; color:var(--brand); margin:0 0 6px}
+  .slide-head h2{margin:0; font-size:26px; letter-spacing:-.02em; text-wrap:balance}
+  .slide-head.tech-head{margin-bottom:14px}
+  .slide-head.tech-head .eyebrow{margin:0; font-size:13px}
+  .slide-sub{color:var(--ink-3); font-weight:600; font-size:13.5px}
+
+  /* ── Technician scorecard ───────────────────────────────── */
+  .tech-grid{display:grid; grid-template-columns:380px 1fr; gap:22px}
+  @media (max-width:860px){ .tech-grid{grid-template-columns:1fr} }
+
+  .profile{
+    background:linear-gradient(170deg,var(--panel-2),var(--panel)); border:1px solid var(--border);
+    border-radius:var(--radius); padding:34px 24px; display:flex; flex-direction:column; align-items:center; text-align:center;
+    justify-content:space-between; gap:22px; position:relative;
+  }
+  .avatar{
+    width:236px; height:236px; border-radius:50%; display:grid; place-items:center;
+    font-size:76px; font-weight:800; color:#fff; letter-spacing:-.02em; position:relative;
+    box-shadow:var(--shadow-lg); background:var(--gradient-brand);
+  }
+  .avatar::after{
+    content:""; position:absolute; inset:-9px; border-radius:50%;
+    border:4px solid var(--disc-color, var(--brand)); opacity:.9;
+  }
+  .p-id{display:flex; flex-direction:column; align-items:center; gap:10px}
+  .p-name{font-size:30px; font-weight:800; letter-spacing:-.02em; line-height:1.1}
+  .p-title{font-size:14px; font-weight:700; color:var(--ink-2); letter-spacing:var(--ls-wide); text-transform:uppercase}
+  .disc-badge{
+    display:inline-flex; align-items:center; gap:9px; padding:8px 16px; border-radius:var(--radius-pill);
+    font-weight:800; font-size:14px; color:var(--disc-color); background:color-mix(in srgb, var(--disc-color) 12%, transparent);
+    border:1px solid color-mix(in srgb, var(--disc-color) 35%, transparent);
+  }
+  .disc-badge .letter{
+    width:24px;height:24px;border-radius:7px;display:grid;place-items:center;background:var(--disc-color);color:#fff;font-size:14px;
+  }
+  .rank-pill{
+    display:inline-flex; align-items:center; gap:8px; font-weight:800; font-size:14px; color:var(--brand-deep);
+    background:var(--blue-50); border:1px solid var(--border); padding:10px 18px; border-radius:var(--radius-pill);
+  }
+  .rank-pill b{color:var(--brand); font-size:16px}
+
+  /* rank medallion — bold, top corner of every scorecard */
+  .rank-corner{
+    position:absolute; top:20px; right:26px; z-index:2;
+    display:flex; align-items:center; gap:14px;
+    background:var(--gradient-brand); color:#fff; border:0; border-radius:20px;
+    padding:12px 20px 12px 16px; box-shadow:var(--shadow-lg);
+  }
+  .rank-corner::before{
+    content:""; position:absolute; inset:-3px; border-radius:22px; z-index:-1;
+    background:var(--disc-color,var(--brand)); opacity:.35;
+  }
+  .rank-corner .medal{font-size:42px; line-height:1; filter:drop-shadow(0 2px 4px rgba(0,0,0,.25))}
+  .rank-corner .rc-txt{display:flex; flex-direction:column; line-height:1.02}
+  .rank-corner .rk{font-size:34px; font-weight:800; letter-spacing:-.03em; color:#fff}
+  .rank-corner .rk small{font-size:16px; font-weight:800; color:rgba(255,255,255,.72); margin-left:2px}
+  .rank-corner .cap{font-size:10.5px; font-weight:800; letter-spacing:var(--ls-wide); text-transform:uppercase; color:rgba(255,255,255,.82)}
+  .rank-corner.podium{box-shadow:var(--shadow-lg), 0 0 0 3px rgba(255,255,255,.15) inset}
+  @media (max-width:560px){ .rank-corner{top:14px; right:14px; padding:9px 14px; gap:10px} .rank-corner .medal{font-size:30px} .rank-corner .rk{font-size:24px} }
+
+  .metrics{display:grid; grid-template-columns:1fr 1fr; gap:16px}
+  .mtile{
+    background:var(--panel); border:1px solid var(--border); border-radius:var(--radius-sm);
+    padding:22px 24px; display:flex; flex-direction:column; gap:12px; box-shadow:var(--shadow); min-height:168px; justify-content:center;
+  }
+  .mtile .lbl{font-size:12.5px; font-weight:800; letter-spacing:var(--ls-wide); text-transform:uppercase; color:var(--ink-3)}
+  .mtile .val{font-size:52px; font-weight:800; letter-spacing:-.03em; line-height:.95; font-variant-numeric:tabular-nums}
+  .mtile .val small{font-size:22px; font-weight:700; color:var(--ink-2); margin-left:2px}
+  .delta{display:inline-flex; align-items:center; gap:5px; font-size:13px; font-weight:800}
+  .delta.up{color:var(--good)} .delta.down{color:var(--bad)} .delta.flat{color:var(--ink-3)}
+  .cmp{height:9px; border-radius:5px; background:var(--bar-soft); position:relative; overflow:hidden}
+  .cmp>i{position:absolute; left:0; top:0; bottom:0; border-radius:5px; background:var(--bar)}
+  .cmp>span{position:absolute; top:-3px; bottom:-3px; width:3px; background:var(--ink-2); border-radius:2px}
+  .cmp-note{font-size:11.5px; color:var(--ink-3); font-weight:600}
+
+  .subchips{display:flex; gap:10px; flex-wrap:wrap; margin-top:14px}
+  .chip{
+    display:flex; flex-direction:column; gap:2px; background:var(--panel-2); border:1px solid var(--border);
+    border-radius:var(--radius-sm); padding:10px 14px; min-width:120px; flex:1;
+  }
+  .chip .k{font-size:11px; font-weight:800; letter-spacing:var(--ls-wide); text-transform:uppercase; color:var(--ink-3)}
+  .chip .v{font-size:19px; font-weight:800; letter-spacing:-.02em; font-variant-numeric:tabular-nums}
+
+  /* ── Leaderboard (dense table) ──────────────────────────── */
+  .lb-hint{font-size:12px; font-weight:700; color:var(--ink-3); letter-spacing:.01em}
+  .lb-scroll{overflow-x:auto; border:1px solid var(--border); border-radius:var(--radius-sm); box-shadow:var(--shadow)}
+  .lb-table{min-width:760px}
+  .lbcols{display:grid; grid-template-columns:58px minmax(190px,1.4fr) repeat(4,minmax(112px,1fr)); align-items:center}
+  .lb-head{background:var(--panel-2); border-bottom:1px solid var(--border)}
+  .lb-head .h{
+    padding:13px 16px; font-size:11px; font-weight:800; letter-spacing:var(--ls-wide); text-transform:uppercase;
+    color:var(--ink-3); background:transparent; border:0; font-family:inherit; text-align:left; cursor:default; width:100%;
+  }
+  .lb-head button.h{cursor:pointer; display:flex; align-items:center; gap:5px}
+  .lb-head button.h:hover{color:var(--ink-2)}
+  .lb-head .h.active{color:var(--brand)}
+  .lb-head .h.num{justify-content:flex-end; text-align:right}
+  .lb-head .h .caret{font-size:9px}
+  .lb-row2{border-bottom:1px solid var(--border-2)}
+  .lb-row2:last-child{border-bottom:0}
+  .lb-row2:nth-child(even){background:color-mix(in srgb,var(--panel-2) 55%, transparent)}
+  .lb-row2.top{background:color-mix(in srgb,var(--brand) 6%, transparent)}
+  .lb-rank{display:flex; align-items:center; justify-content:center; gap:2px; padding:12px 8px; font-size:19px; font-weight:800; color:var(--ink-3); font-variant-numeric:tabular-nums}
+  .lb-row2.top .lb-rank{color:var(--brand)}
+  .lb-rank .medal{font-size:22px}
+  .lb-id{display:flex; align-items:center; gap:12px; min-width:0; padding:11px 16px 11px 4px}
+  .lb-av{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;color:#fff;font-weight:800;font-size:15px;background:var(--gradient-brand);flex:none;position:relative}
+  .lb-av::after{content:"";position:absolute;inset:-3px;border-radius:50%;border:2px solid var(--disc-color,transparent)}
+  .lb-name{font-weight:800; font-size:15px; letter-spacing:-.01em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  .lb-title{font-size:11px; color:var(--ink-3); font-weight:700; letter-spacing:.02em}
+  .lbcell{display:flex; flex-direction:column; gap:6px; padding:11px 16px; min-width:0}
+  .lbcell .num{font-weight:800; font-size:15px; text-align:right; font-variant-numeric:tabular-nums; letter-spacing:-.02em; color:var(--ink-2)}
+  .lbcell .b{height:6px; border-radius:4px; background:var(--bar-soft); overflow:hidden}
+  .lbcell .b>i{display:block; height:100%; border-radius:4px; background:var(--bar-soft)}
+  .lbcell.active{background:color-mix(in srgb,var(--brand) 7%, transparent)}
+  .lbcell.active .num{color:var(--brand-deep); font-size:16px}
+  .lbcell.active .b>i{background:var(--bar)}
+  .lb-row2.top .lbcell.active .b>i{background:var(--bar-hi)}
+
+  /* ── Company goals ──────────────────────────────────────── */
+  .goals-wrap{display:flex; flex-direction:column; gap:20px}
+  .goals-mascot{width:132px; height:132px; border-radius:50%; flex:none; filter:drop-shadow(var(--shadow))}
+  @media (max-width:640px){ .goals-mascot{width:76px; height:76px} }
+  /* hero revenue band */
+  .g-hero{
+    background:var(--gradient-brand); color:#fff; border-radius:var(--radius); padding:30px 34px;
+    display:grid; grid-template-columns:1fr auto; align-items:center; gap:24px; box-shadow:var(--shadow-lg); position:relative; overflow:hidden;
+  }
+  .g-hero::after{content:""; position:absolute; right:-60px; top:-60px; width:260px; height:260px; border-radius:50%; background:rgba(255,255,255,.07)}
+  .g-hero .h-lbl{font-size:13px; font-weight:800; letter-spacing:var(--ls-wider); text-transform:uppercase; color:rgba(255,255,255,.8); margin-bottom:8px}
+  .g-hero .h-val{font-size:66px; font-weight:800; letter-spacing:-.03em; line-height:1; font-variant-numeric:tabular-nums}
+  .g-hero .h-tgt{font-size:16px; font-weight:700; color:rgba(255,255,255,.82); margin-top:8px}
+  .h-meter{height:12px; border-radius:7px; background:rgba(255,255,255,.22); position:relative; overflow:hidden; margin-top:16px; max-width:520px}
+  .h-meter>i{position:absolute; left:0; top:0; bottom:0; border-radius:7px; background:#fff}
+  .h-meter>span{position:absolute; top:-4px; bottom:-4px; width:3px; background:#fff; opacity:.65; border-radius:2px}
+  .h-attain{display:flex; flex-direction:column; align-items:center; gap:4px; z-index:1}
+  .h-attain .big{font-size:60px; font-weight:800; letter-spacing:-.03em; line-height:1}
+  .h-attain .cap{font-size:10.5px; font-weight:800; letter-spacing:var(--ls-wide); text-transform:uppercase; color:rgba(255,255,255,.82)}
+
+  .goals-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:16px}
+  @media (max-width:860px){ .goals-grid{grid-template-columns:1fr} }
+  .goal{
+    background:linear-gradient(168deg,var(--blue-50),var(--panel) 78%); border:1px solid var(--border);
+    border-radius:var(--radius); padding:26px 24px; display:grid; grid-template-columns:auto 1fr; gap:24px; align-items:center; box-shadow:var(--shadow);
+  }
+  .goal .g-body{display:flex; flex-direction:column; gap:8px; min-width:0}
+  .goal .g-lbl{font-size:13px; font-weight:800; letter-spacing:var(--ls-wide); text-transform:uppercase; color:var(--brand); }
+  .goal .g-val{font-size:42px; font-weight:800; letter-spacing:-.03em; line-height:1; font-variant-numeric:tabular-nums}
+  .goal .g-val small{font-size:20px; color:var(--ink-2); font-weight:800}
+  .goal .g-tgt{font-size:12.5px; font-weight:700; color:var(--ink-2)}
+  .status{display:inline-flex; align-items:center; gap:6px; font-weight:800; font-size:11.5px; padding:5px 11px; border-radius:var(--radius-pill); width:fit-content}
+  .status.good{color:var(--good); background:var(--good-wash)}
+  .status.warn{color:var(--warn); background:var(--warn-wash)}
+  .status.bad{color:var(--bad); background:var(--bad-wash)}
+
+  /* conic ring gauge component */
+  .ring{width:124px; height:124px; border-radius:50%; display:grid; place-items:center; position:relative; flex:none;
+    background:conic-gradient(var(--brand) calc(var(--p,0)*1%), var(--bar-soft) 0);}
+  .ring::before{content:""; position:absolute; inset:12px; border-radius:50%; background:var(--panel)}
+  .ring .ring-txt{position:relative; font-size:26px; font-weight:800; letter-spacing:-.02em; font-variant-numeric:tabular-nums}
+  .ring.gold{background:conic-gradient(var(--disc-i) calc(var(--p,0)*1%), var(--bar-soft) 0)}
+
+  /* star rating (gray base + gold clipped overlay) */
+  .stars{display:flex; align-items:center; gap:8px}
+  .stars .track{position:relative; font-size:23px; letter-spacing:2px; line-height:1; white-space:nowrap}
+  .stars .track .base{color:var(--bar-soft)}
+  .stars .track .fill{position:absolute; left:0; top:0; overflow:hidden; white-space:nowrap; color:var(--disc-i)}
+  .stars .num{font-size:18px; font-weight:800; color:var(--ink)}
+  .stars .cnt{font-size:14px; font-weight:700; color:var(--ink-3)}
+
+  .ctx-strip{display:grid; grid-template-columns:repeat(4,1fr); gap:14px}
+  @media (max-width:860px){ .ctx-strip{grid-template-columns:repeat(2,1fr)} }
+  .ctx{background:var(--panel-2); border:1px solid var(--border); border-left:4px solid var(--brand); border-radius:var(--radius-sm); padding:18px 18px; display:flex; flex-direction:column; gap:3px}
+  .ctx .k{font-size:12px; font-weight:800; letter-spacing:var(--ls-wide); text-transform:uppercase; color:var(--ink-3)}
+  .ctx .v{font-size:30px; font-weight:800; letter-spacing:-.02em; font-variant-numeric:tabular-nums}
+
+  /* ── Footer filmstrip ───────────────────────────────────── */
+  .filmstrip{
+    display:flex; align-items:center; gap:14px; background:var(--panel); border:1px solid var(--border);
+    border-radius:var(--radius); padding:10px 16px; box-shadow:var(--shadow);
+  }
+  .navbtn{width:40px;height:40px;border-radius:11px;border:1px solid var(--border);background:var(--panel-2);color:var(--ink-2);cursor:pointer;font-size:16px;font-family:inherit;display:grid;place-items:center}
+  .navbtn:hover{color:var(--brand);border-color:var(--brand)}
+  .dots{display:flex; align-items:center; gap:8px; flex:1; flex-wrap:wrap}
+  .dots button{width:11px;height:11px;border-radius:50%;border:0;background:var(--bar-soft);cursor:pointer;padding:0}
+  .dots button.on{background:var(--brand); box-shadow:0 0 0 3px color-mix(in srgb,var(--brand) 22%, transparent)}
+  .dots button.goals.on,.dots button.lb.on{background:var(--brand)}
+  .progress{height:5px; background:var(--bar-soft); border-radius:3px; overflow:hidden; flex:1; max-width:220px}
+  .progress>i{display:block; height:100%; width:0; background:var(--brand); border-radius:3px}
+  .now-label{font-size:12.5px; font-weight:800; color:var(--ink-2); letter-spacing:.01em; white-space:nowrap}
+
+  .foot-note{text-align:center; color:var(--ink-3); font-size:11.5px; font-weight:600; margin-top:2px}
+
+  /* technician photo fills avatar / leaderboard avatar (ServiceTitan headshot) */
+  .avatar .ava-photo{width:100%;height:100%;border-radius:50%;object-fit:cover;display:block}
+  .lb-av .ava-photo{position:absolute;inset:0;width:100%;height:100%;border-radius:50%;object-fit:cover}
+</style>
+
+<div class="app">
+  <div class="topbar">
+    <div class="brand">
+      <img class="logo-img logo-light" src="assets/patchitup-wordmark-color.webp" alt="PatchitUP — For Every Type of Drywall Damage" />
+      <img class="logo-img logo-dark" src="assets/patchitup-wordmark-white.png" alt="PatchitUP — For Every Type of Drywall Damage" />
+      <span class="dept">Technician Dashboard</span>
+    </div>
+    <div class="loc-pill"><span class="dot-live" id="liveDot"></span> <span id="locName">Nassau County</span></div>
+    <select class="range" id="locSel" style="display:none"></select>
+    <div class="spacer"></div>
+    <div class="controls">
+      <select class="range" id="range">
+        <option value="week">This Week</option>
+        <option value="month" selected>This Month</option>
+        <option value="quarter">This Quarter</option>
+        <option value="ytd">Year to Date</option>
+      </select>
+      <div class="seg" id="mode">
+        <button data-mode="kiosk" class="on">◐ Kiosk</button>
+        <button data-mode="interactive">☱ Interactive</button>
+      </div>
+      <span class="clock" id="clock">—</span>
+      <button class="iconbtn" id="theme" title="Toggle theme">◑</button>
+    </div>
+  </div>
+
+  <div class="stage-wrap"><div class="stage"><div id="stage"></div></div></div>
+
+  <div class="filmstrip">
+    <button class="navbtn" id="prev" title="Previous">‹</button>
+    <div class="dots" id="dots"></div>
+    <span class="now-label" id="nowLabel">—</span>
+    <div class="progress" id="progress"><i></i></div>
+    <button class="navbtn" id="play" title="Pause / play">❚❚</button>
+    <button class="navbtn" id="next" title="Next">›</button>
+  </div>
+  <div class="foot-note">Revenue, Sales, Conversion &amp; Opp Job Average pull live from ServiceTitan; title, DISC letter, goals &amp; reviews are set in admin.</div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  /* =====================================================================
+     PatchitUP — Location Technician Dashboard (front-end)
+     Data seam: LIVE ServiceTitan (via /api/*) or in-page SAMPLE fallback.
+     Admin-entered fields (title, DISC letter, goals, reviews) come from the
+     OVERLAY layer below — a local config now, swappable to Supabase later
+     with no UI changes (see DataLayer.loadOverlay).
+     ===================================================================== */
+
+  // ---- optional runtime config (set window.PIU_CONFIG = {apiBase} to point elsewhere)
+  const CFG = (typeof window!=='undefined' && window.PIU_CONFIG) || {};
+
+  // ===================== OVERLAY (admin data → Supabase later) ===========
+  // Keyed by ServiceTitan tenant id (string). Per-tech overrides key by
+  // technician id, falling back to exact name. `_default` fills any gap.
+  const OVERLAY = {
+    _default: {
+      goals: {
+        revenue:     { target: 350000 },
+        close:       { target: 0.65 },
+        reviews:     { actual: 0, target: 60, rating: null, total: null },
+        memberships: { actual: 0, target: 35 },
+        cancellations: 0,
+      },
+      techMeta: { title: 'Technician', disc: null },
+    },
+    byTenant: {
+      // Example — fill in once the live Nassau tenant id + roster are known:
+      // '123456': { goals:{...}, techs:{ 'Marcus Reyes': {title:'Lead Technician', disc:'D'} } }
+    },
+  };
+
+  // ===================== SAMPLE (demo when no live backend) ==============
+  const SAMPLE_TECHS = [
+    {id:'s1', name:"Marcus Reyes",  title:"Lead Technician",   disc:"D", revenue:48200, sales:41500, conv:0.68, oja:642, opps:75, converted:51, hours:168, salesHr:247},
+    {id:'s2', name:"Danielle Cho",  title:"Senior Technician", disc:"I", revenue:43900, sales:39800, conv:0.64, oja:585, opps:75, converted:48, hours:171, salesHr:233},
+    {id:'s3', name:"Andre Willis",  title:"Lead Technician",   disc:"D", revenue:41250, sales:36400, conv:0.66, oja:604, opps:68, converted:45, hours:160, salesHr:228},
+    {id:'s4', name:"Sofia Marino",  title:"Technician",        disc:"C", revenue:37800, sales:34100, conv:0.71, oja:559, opps:68, converted:48, hours:166, salesHr:205},
+    {id:'s5', name:"Priya Nair",    title:"Technician",        disc:"I", revenue:34600, sales:31900, conv:0.62, oja:548, opps:63, converted:39, hours:158, salesHr:202},
+    {id:'s6', name:"Tyrone Jackson",title:"Technician",        disc:"S", revenue:31200, sales:28400, conv:0.59, oja:520, opps:60, converted:35, hours:162, salesHr:175},
+    {id:'s7', name:"Luis Fernández",title:"Technician",        disc:"C", revenue:27950, sales:25100, conv:0.57, oja:498, opps:56, converted:32, hours:150, salesHr:167},
+    {id:'s8', name:"Kevin O'Brien", title:"Apprentice",        disc:"S", revenue:19400, sales:17200, conv:0.51, oja:441, opps:44, converted:22, hours:139, salesHr:124},
+  ];
+  const SAMPLE_GOALS = {
+    revenue:{actual:312400, target:350000},
+    close:{actual:0.63, target:0.65},
+    reviews:{actual:47, target:60, rating:4.8, total:326},
+    memberships:{actual:28, target:35},
+    cancellations:11,
+  };
+
+  // ===================== helpers ========================================
+  const $ = (s,r=document)=>r.querySelector(s);
+  const usd  = n => "$"+Math.round(n||0).toLocaleString("en-US");
+  const usdK = n => n>=1000 ? "$"+(n/1000).toFixed(n>=10000?0:1)+"k" : "$"+Math.round(n||0);
+  const pct  = n => Math.round((n||0)*100)+"%";
+  const initials = name => (name||"?").split(/\s+/).map(w=>w[0]).slice(0,2).join("").toUpperCase();
+  const ordinal = n => n+(["th","st","nd","rd"][(n%100>10&&n%100<14)?0:(n%10<4?n%10:0)]);
+  const medals = ["🥇","🥈","🥉"];
+  const clampPct = r => Math.max(0, Math.min(100, Math.round((r||0)*100)));
+  const DISC = {
+    D:{word:"Dominance",     v:"var(--disc-d)"},
+    I:{word:"Influence",     v:"var(--disc-i)"},
+    S:{word:"Steadiness",    v:"var(--disc-s)"},
+    C:{word:"Conscientious", v:"var(--disc-c)"},
+  };
+  const LB_METRICS = [
+    {key:"revenue", label:"Revenue",    fmt:usd},
+    {key:"sales",   label:"Sales",      fmt:usd},
+    {key:"conv",    label:"Conversion", fmt:pct},
+    {key:"oja",     label:"Opp Job Avg",fmt:usd},
+  ];
+  const MASCOT = "assets/patchitup-mascot.png";
+
+  // date-range → [fromISO, toISO] as 'YYYY-MM-DD' (inclusive), based on today.
+  const iso = d => d.toISOString().slice(0,10);
+  function rangeBounds(key){
+    const now = new Date();
+    const y = now.getUTCFullYear(), m = now.getUTCMonth(), d = now.getUTCDate();
+    const to = iso(now); let from;
+    if(key==='week'){ const dow=(now.getUTCDay()+6)%7; const s=new Date(Date.UTC(y,m,d-dow)); from=iso(s); }
+    else if(key==='quarter'){ const qm=Math.floor(m/3)*3; from=iso(new Date(Date.UTC(y,qm,1))); }
+    else if(key==='ytd'){ from=iso(new Date(Date.UTC(y,0,1))); }
+    else { from=iso(new Date(Date.UTC(y,m,1))); }   // month (default)
+    return [from, to];
+  }
+  const MONTHS=["January","February","March","April","May","June","July","August","September","October","November","December"];
+  function periodLabel(key){
+    const now=new Date(), y=now.getUTCFullYear();
+    if(key==='week') return "This Week";
+    if(key==='quarter') return "Q"+(Math.floor(now.getUTCMonth()/3)+1)+" "+y;
+    if(key==='ytd') return y+" YTD";
+    return MONTHS[now.getUTCMonth()]+" "+y;
+  }
+
+  // ===================== state ==========================================
+  let techs = [], teamAvg = {}, location = {};
+  let range = 'month';
+
+  // ===================== DataLayer / Adapter ============================
+  // Mirrors the proven adapter contract: /api/health decides live vs sample;
+  // /api/locations + per-tenant /tech-daily feed the KPI math. Only the very
+  // first load may fall back to sample; refreshes keep the last good data.
+  const Adapter = {
+    mode:'sample', apiBase:'', locations:[], currentTenant:null,
+    techDaily:new Map(),   // tenant -> { roster, daily }
+    async init(){
+      this.apiBase = String(CFG.apiBase!=null?CFG.apiBase:'').replace(/\/$/,'');
+      try{ const h=await fetch(this.apiBase+'/api/health',{cache:'no-store'});
+        if(h.ok){ const j=await h.json().catch(()=>null); if(j&&j.ok) this.mode='live'; } }catch(_){}
+      if(this.mode==='live') await this.preload({initial:true});
+      if(this.mode!=='live'){ this.locations=[{name:'Nassau County', tenant:'sample'}]; this.currentTenant='sample'; }
+    },
+    async preload({initial=false}={}){
+      try{
+        const locs = await (await fetch(this.apiBase+'/api/locations',{cache:'no-store'})).json();
+        if(!Array.isArray(locs)||!locs.length) throw new Error('no locations');
+        this.locations = locs.map(l=>({name:l.name, tenant:String(l.tenant), code:l.code||'', region:l.region||''}));
+        if(!this.currentTenant) this.currentTenant=this.locations[0].tenant;
+        await Promise.all(this.locations.map(async l=>{
+          try{ const td=await (await fetch(`${this.apiBase}/api/locations/${l.tenant}/tech-daily`)).json();
+            if(td&&td.daily&&Object.keys(td.daily).length) this.techDaily.set(l.tenant, td); }catch(_){}
+        }));
+      }catch(_){ if(initial) this.mode='sample'; }
+    },
+    async refresh(){ if(this.mode==='live') await this.preload({initial:false}); },
+  };
+
+  function overlayFor(tenant){ return (OVERLAY.byTenant[tenant]) || OVERLAY._default; }
+  function techMeta(tenant, id, rosterName){
+    const ov = overlayFor(tenant);
+    const t = (ov.techs && (ov.techs[id] || ov.techs[rosterName])) || {};
+    return { title: t.title || OVERLAY._default.techMeta.title, disc: t.disc || OVERLAY._default.techMeta.disc };
+  }
+  function goalsFor(tenant){
+    const ov = overlayFor(tenant).goals || {};
+    const d = OVERLAY._default.goals;
+    return {
+      revenue:{ target:(ov.revenue&&ov.revenue.target)||d.revenue.target },
+      close:{ target:(ov.close&&ov.close.target)||d.close.target },
+      reviews:{ actual:(ov.reviews&&ov.reviews.actual)||d.reviews.actual, target:(ov.reviews&&ov.reviews.target)||d.reviews.target,
+                rating:(ov.reviews&&ov.reviews.rating)||d.reviews.rating, total:(ov.reviews&&ov.reviews.total)||d.reviews.total },
+      memberships:{ actual:(ov.memberships&&ov.memberships.actual)||d.memberships.actual, target:(ov.memberships&&ov.memberships.target)||d.memberships.target },
+      cancellations: ov.cancellations!=null?ov.cancellations:d.cancellations,
+    };
+  }
+
+  // Total tech-daily rows [opps,converted,options,sales,pipeline,hours,jobs,completedRevenue]
+  // over the selected date range → per-tech KPI objects.
+  function computeTechsLive(tenant){
+    const td = Adapter.techDaily.get(tenant);
+    if(!td) return [];
+    const [from,to] = rangeBounds(range);
+    const tot = {};
+    for(const day in td.daily){
+      if(day<from || day>to) continue;
+      const m = td.daily[day];
+      for(const id in m){
+        const row=m[id]; const s = tot[id] || (tot[id]=[0,0,0,0,0,0,0,0]);
+        for(let i=0;i<8;i++) s[i]+=row[i]||0;
+      }
+    }
+    return Object.keys(tot).map(id=>{
+      const s=tot[id]; const opps=s[0],converted=s[1],sales=s[3],hours=s[5],revenue=s[7];
+      const rosterName=(td.roster[id]&&td.roster[id].name)||('Technician '+id);
+      const meta=techMeta(tenant,id,rosterName);
+      return { id, name:rosterName, photo:(td.roster[id]&&td.roster[id].photo)||null,
+        title:meta.title, disc:meta.disc,
+        revenue, sales, conv:opps?converted/opps:0, oja:opps?revenue/opps:0,
+        opps, converted, hours:Math.round(hours), salesHr:hours?sales/hours:0 };
+    }).filter(t=>t.id!=='unassigned' && (t.opps>0||t.revenue>0||t.sales>0))
+      .sort((a,b)=>b.revenue-a.revenue);
+  }
+
+  function computeTeamAvg(){
+    const n=techs.length||1;
+    const sum=k=>techs.reduce((a,t)=>a+(t[k]||0),0);
+    teamAvg = { revenue:sum('revenue')/n, sales:sum('sales')/n, conv:sum('conv')/n, oja:sum('oja')/n };
+  }
+  function rankOf(tech,key){ return [...techs].sort((a,b)=>b[key]-a[key]).indexOf(tech)+1; }
+
+  function buildLocation(){
+    const tenant=Adapter.currentTenant;
+    const name=(Adapter.locations.find(l=>l.tenant===tenant)||{}).name||'Location';
+    if(Adapter.mode!=='live' || tenant==='sample'){
+      const g=SAMPLE_GOALS;
+      location = { name, period:periodLabel(range),
+        goals:{ revenue:{...g.revenue}, close:{...g.close}, reviews:{...g.reviews} },
+        context:{ opportunities:509, oppJobAvg:551, memberships:g.memberships.actual, membershipsTarget:g.memberships.target, cancellations:g.cancellations } };
+      return;
+    }
+    const g=goalsFor(tenant);
+    const totRev=techs.reduce((a,t)=>a+t.revenue,0);
+    const totOpps=techs.reduce((a,t)=>a+t.opps,0);
+    const totConv=techs.reduce((a,t)=>a+t.converted,0);
+    const close=totOpps?totConv/totOpps:0;
+    location = { name, period:periodLabel(range),
+      goals:{ revenue:{actual:totRev, target:g.revenue.target},
+              close:{actual:close, target:g.close.target},
+              reviews:{...g.reviews} },
+      context:{ opportunities:totOpps, oppJobAvg:totOpps?totRev/totOpps:0,
+                memberships:g.memberships.actual, membershipsTarget:g.memberships.target, cancellations:g.cancellations } };
+  }
+
+  function loadData(){
+    if(Adapter.mode==='live' && Adapter.currentTenant && Adapter.currentTenant!=='sample'){
+      techs = computeTechsLive(Adapter.currentTenant);
+      if(!techs.length){ techs = SAMPLE_TECHS.map(t=>({...t})); }  // no rows in range → show demo rather than blank
+    } else {
+      techs = SAMPLE_TECHS.map(t=>({...t}));
+    }
+    computeTeamAvg();
+    buildLocation();
+    buildSlides();
+    paint();
+    updateChrome();
+  }
+
+  // ===================== render: technician scorecard ===================
+  function metricTile(label, valueHtml, techVal, teamVal, fmt){
+    const max=Math.max(techVal,teamVal)*1.15||1;
+    const fillPct=Math.min(100,techVal/max*100), tickPct=Math.min(100,teamVal/max*100);
+    const diff=teamVal?(techVal-teamVal)/teamVal:0;
+    const dcls=diff>0.01?"up":diff<-0.01?"down":"flat";
+    const arrow=diff>0.01?"▲":diff<-0.01?"▼":"–";
+    return `<div class="mtile">
+      <div class="lbl">${label}</div>
+      <div class="val">${valueHtml}</div>
+      <div class="delta ${dcls}">${arrow} ${(diff>0?"+":"")+Math.round(diff*100)}% vs team avg</div>
+      <div class="cmp"><i style="width:${fillPct}%"></i><span style="left:${tickPct}%"></span></div>
+      <div class="cmp-note">Team avg ${fmt(teamVal)}</div>
+    </div>`;
+  }
+  function avatarInner(tech){
+    return tech.photo ? `<img class="ava-photo" src="${tech.photo}" alt="${tech.name}"/>` : initials(tech.name);
+  }
+  function renderTech(tech){
+    const d=DISC[tech.disc]||{word:"—",v:"var(--brand)"};
+    const rk=rankOf(tech,"revenue"); const podium=rk<=3;
+    return `<div class="slide" style="--disc-color:${d.v}">
+      <div class="rank-corner ${podium?"podium":""}">
+        ${podium?`<div class="medal">${medals[rk-1]}</div>`:""}
+        <div class="rc-txt"><span class="rk">${ordinal(rk)}<small>/${techs.length}</small></span><span class="cap">Revenue Rank</span></div>
+      </div>
+      <div class="slide-head tech-head"><p class="eyebrow">Technician Scorecard · ${location.name} · ${location.period}</p></div>
+      <div class="tech-grid">
+        <div class="profile">
+          <div class="avatar">${avatarInner(tech)}</div>
+          <div class="p-id">
+            <div class="p-name">${tech.name}</div>
+            <div class="p-title">${tech.title}</div>
+            ${tech.disc?`<div class="disc-badge"><span class="letter">${tech.disc}</span> ${d.word}</div>`:``}
+          </div>
+          <div class="rank-pill">Revenue rank <b>#${rk}</b> of ${techs.length}</div>
+        </div>
+        <div>
+          <div class="metrics">
+            ${metricTile("Revenue", usd(tech.revenue), tech.revenue, teamAvg.revenue, usdK)}
+            ${metricTile("Sales", usd(tech.sales), tech.sales, teamAvg.sales, usdK)}
+            ${metricTile("Opportunity Conversion", pct(tech.conv), tech.conv, teamAvg.conv, pct)}
+            ${metricTile("Opp Job Average", usd(tech.oja), tech.oja, teamAvg.oja, usd)}
+          </div>
+          <div class="subchips">
+            <div class="chip"><span class="k">Opportunities</span><span class="v">${tech.opps}</span></div>
+            <div class="chip"><span class="k">Converted</span><span class="v">${tech.converted}</span></div>
+            <div class="chip"><span class="k">Labor Hours</span><span class="v">${tech.hours}</span></div>
+            <div class="chip"><span class="k">Sales / Hour</span><span class="v">${usd(tech.salesHr)}</span></div>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  // ===================== render: leaderboard ============================
+  function renderLeaderboard(lbMetric){
+    const m=LB_METRICS.find(x=>x.key===lbMetric)||LB_METRICS[0];
+    const sorted=[...techs].sort((a,b)=>b[m.key]-a[m.key]);
+    const header=`<div class="lbcols lb-head">
+      <div class="h">#</div><div class="h">Technician</div>
+      ${LB_METRICS.map(x=>`<button class="h num ${x.key===lbMetric?"active":""}" data-k="${x.key}">${x.label}${x.key===lbMetric?' <span class="caret">▼</span>':''}</button>`).join("")}
+    </div>`;
+    const rows=sorted.map((t,i)=>{
+      const cells=LB_METRICS.map(x=>`<div class="lbcell ${x.key===lbMetric?"active":""}"><span class="num">${x.fmt(t[x.key])}</span></div>`).join("");
+      return `<div class="lbcols lb-row2 ${i<3?"top":""}" style="--disc-color:${(DISC[t.disc]||{}).v||'transparent'}">
+        <div class="lb-rank">${i<3?`<span class="medal">${medals[i]}</span>`:(i+1)}</div>
+        <div class="lb-id"><div class="lb-av">${t.photo?`<img class="ava-photo" src="${t.photo}" alt=""/>`:initials(t.name)}</div>
+          <div style="min-width:0"><div class="lb-name">${t.name}</div><div class="lb-title">${t.title}${t.disc?` · DISC ${t.disc}`:''}</div></div></div>
+        ${cells}
+      </div>`;
+    }).join("");
+    return `<div class="slide">
+      <div class="slide-head"><div><p class="eyebrow">Team Leaderboard</p><h2>Ranked by ${m.label}</h2>
+        <div class="slide-sub">${location.name} · ${location.period} · ${techs.length} technicians</div></div>
+        <div class="lb-hint">Tap a metric to re-rank →</div></div>
+      <div class="lb-scroll"><div class="lb-table" id="lbTable">${header}${rows}</div></div>
+    </div>`;
+  }
+
+  // ===================== render: company goals ==========================
+  function statusOf(r){ if(r>=1) return {cls:"good",txt:"Goal met",ic:"✓"}; if(r>=0.85) return {cls:"warn",txt:"On pace",ic:"→"}; return {cls:"bad",txt:"Behind",ic:"!"}; }
+  function ringGoal(lbl,valHtml,tgtHtml,ratio,gold){
+    const s=statusOf(ratio), p=clampPct(ratio);
+    return `<div class="goal"><div class="ring ${gold?"gold":""}" style="--p:${p}"><span class="ring-txt">${p}%</span></div>
+      <div class="g-body"><div class="g-lbl">${lbl}</div><div class="g-val">${valHtml}</div><div class="g-tgt">Target ${tgtHtml}</div>
+      <span class="status ${s.cls}">${s.ic} ${s.txt}</span></div></div>`;
+  }
+  function reviewsGoal(r){
+    const ratio=r.target?r.actual/r.target:0, p=clampPct(ratio), s=statusOf(ratio);
+    const stars = r.rating!=null
+      ? `<span class="track"><span class="base">★★★★★</span><span class="fill" style="width:${(r.rating/5*100).toFixed(1)}%">★★★★★</span></span><span class="num">${r.rating.toFixed(1)}</span>${r.total!=null?`<span class="cnt">· ${r.total} total</span>`:''}`
+      : `<span class="cnt">rating not synced</span>`;
+    return `<div class="goal"><div class="ring gold" style="--p:${p}"><span class="ring-txt">${r.actual}</span></div>
+      <div class="g-body"><div class="g-lbl">Google Reviews · New This Period</div><div class="g-val">${r.actual}<small> / ${r.target}</small></div>
+      <div class="stars">${stars}</div><span class="status ${s.cls}">${s.ic} ${s.txt}</span></div></div>`;
+  }
+  function renderGoals(){
+    const g=location.goals, c=location.context;
+    const revFill=clampPct(g.revenue.actual/g.revenue.target);
+    const scaleMax=Math.max(g.revenue.actual,g.revenue.target)*1.08||1;
+    const revTick=Math.min(100,g.revenue.target/scaleMax*100), revPos=Math.min(100,g.revenue.actual/scaleMax*100);
+    const memT=c.membershipsTarget||35;
+    return `<div class="slide">
+      <div class="slide-head"><div><p class="eyebrow">Company Goals</p><h2>${location.name}</h2>
+        <div class="slide-sub">${location.period} · progress to targets</div></div>
+        <img class="goals-mascot" src="${MASCOT}" alt="PatchitUP"/></div>
+      <div class="goals-wrap">
+        <div class="g-hero">
+          <div><div class="h-lbl">Revenue to Goal</div><div class="h-val">${usd(g.revenue.actual)}</div>
+            <div class="h-tgt">of ${usd(g.revenue.target)} target · ${usd(Math.max(0,g.revenue.target-g.revenue.actual))} to go</div>
+            <div class="h-meter"><i style="width:${revPos}%"></i><span style="left:${revTick}%"></span></div></div>
+          <div class="h-attain"><div class="big">${revFill}%</div><div class="cap">of goal</div></div>
+        </div>
+        <div class="goals-grid">
+          ${ringGoal("Average Close Rate", pct(g.close.actual), pct(g.close.target), g.close.target?g.close.actual/g.close.target:0)}
+          ${reviewsGoal(g.reviews)}
+          ${ringGoal("Memberships Sold", c.memberships, memT, memT?c.memberships/memT:0, true)}
+        </div>
+        <div class="ctx-strip">
+          <div class="ctx"><span class="k">Opportunities</span><span class="v">${c.opportunities}</span></div>
+          <div class="ctx"><span class="k">Opp Job Avg</span><span class="v">${usd(c.oppJobAvg)}</span></div>
+          <div class="ctx"><span class="k">Avg Close Rate</span><span class="v">${pct(g.close.actual)}</span></div>
+          <div class="ctx"><span class="k">Cancellations</span><span class="v">${c.cancellations}</span></div>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  // ===================== slides + kiosk controller ======================
+  let slides=[], idx=0;
+  const stage=$("#stage"), dotsEl=$("#dots"), nowLabel=$("#nowLabel");
+  const progFill=$("#progress").firstElementChild;
+
+  function buildSlides(){
+    slides=[
+      {type:"goals", label:"Company Goals", render:renderGoals},
+      ...techs.map(t=>({type:"tech", label:(t.name||"").split(" ")[0], render:()=>renderTech(t)})),
+      ...LB_METRICS.map(m=>({type:"lb", metric:m.key, label:`Leaders · ${m.label}`, render(){return renderLeaderboard(this.metric);}})),
+    ];
+    if(idx>=slides.length) idx=0;
+    dotsEl.innerHTML=slides.map((s,i)=>`<button data-i="${i}" class="${s.type} ${i===idx?"on":""}" title="${s.label}"></button>`).join("");
+  }
+  function paint(){
+    stage.innerHTML=slides[idx].render();
+    [...dotsEl.children].forEach((b,i)=>b.classList.toggle("on",i===idx));
+    nowLabel.textContent = slides[idx].type==="tech" ? `Scorecard · ${slides[idx].label}` : slides[idx].label;
+    if(slides[idx].type==="lb"){ const tbl=$("#lbTable"); tbl&&tbl.addEventListener("click",e=>{ const b=e.target.closest("button.h"); if(!b)return; slides[idx].metric=b.dataset.k; paint(); restart(); }); }
+  }
+  function go(n){ idx=(n+slides.length)%slides.length; paint(); restart(); }
+
+  const DWELL={goals:13000, tech:7000, lb:6000};
+  const dwellFor=()=>DWELL[slides[idx].type]||8000;
+  let mode="kiosk", playing=true, t0=0, raf=0;
+  function frame(ts){ if(!t0)t0=ts; const p=Math.min(1,(ts-t0)/dwellFor()); progFill.style.width=(p*100)+"%"; if(p>=1){t0=0;go(idx+1);return;} raf=requestAnimationFrame(frame); }
+  function restart(){ cancelAnimationFrame(raf); t0=0; progFill.style.width="0%"; if(mode==="kiosk"&&playing) raf=requestAnimationFrame(frame); }
+  function setPlaying(p){ playing=p; $("#play").textContent=p?"❚❚":"▶"; restart(); }
+  function setMode(m){ mode=m; [...$("#mode").children].forEach(b=>b.classList.toggle("on",b.dataset.mode===m)); $("#progress").style.visibility=m==="kiosk"?"visible":"hidden"; $("#play").style.display=m==="kiosk"?"grid":"none"; restart(); }
+
+  // ===================== chrome: toolbar wiring =========================
+  function updateChrome(){
+    // location pill + live/sample dot
+    const pill=$("#locName"); if(pill) pill.textContent=location.name;
+    const dot=$("#liveDot"); if(dot){ dot.style.background=Adapter.mode==='live'?'var(--good)':'var(--ink-3)'; dot.title=Adapter.mode==='live'?'Live ServiceTitan data':'Sample data'; }
+    // location selector options (multi-location)
+    const sel=$("#locSel");
+    if(sel){ if(Adapter.locations.length>1){ sel.style.display=''; sel.innerHTML=Adapter.locations.map(l=>`<option value="${l.tenant}" ${l.tenant===Adapter.currentTenant?'selected':''}>${l.name}</option>`).join(''); } else { sel.style.display='none'; } }
+  }
+
+  $("#prev").addEventListener("click",()=>go(idx-1));
+  $("#next").addEventListener("click",()=>go(idx+1));
+  $("#play").addEventListener("click",()=>setPlaying(!playing));
+  dotsEl.addEventListener("click",e=>{ const b=e.target.closest("button"); if(b) go(+b.dataset.i); });
+  $("#mode").addEventListener("click",e=>{ const b=e.target.closest("button"); if(b) setMode(b.dataset.mode); });
+  $("#range").addEventListener("change",e=>{ range=e.target.value; loadData(); });
+  const locSel=$("#locSel"); locSel&&locSel.addEventListener("change",e=>{ Adapter.currentTenant=e.target.value; loadData(); });
+  document.addEventListener("keydown",e=>{ if(e.key==="ArrowRight")go(idx+1); else if(e.key==="ArrowLeft")go(idx-1); else if(e.key===" "){e.preventDefault();setPlaying(!playing);} });
+  $(".stage").addEventListener("mouseenter",()=>{ if(mode==="kiosk")cancelAnimationFrame(raf); });
+  $(".stage").addEventListener("mouseleave",()=>{ if(mode==="kiosk"&&playing)restart(); });
+  $("#theme").addEventListener("click",()=>{ const cur=document.documentElement.getAttribute("data-theme"); const sysDark=window.matchMedia("(prefers-color-scheme: dark)").matches; document.documentElement.setAttribute("data-theme", cur?(cur==="dark"?"light":"dark"):(sysDark?"light":"dark")); });
+  function tick(){ const el=$("#clock"); if(el) el.textContent=new Date().toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"}); }
+  setInterval(tick,1000); tick();
+
+  // periodic live refresh (kept live; never downgrades to sample)
+  setInterval(()=>{ if(Adapter.mode==='live') Adapter.refresh().then(loadData).catch(()=>{}); }, 15*60*1000);
+
+  // ===================== boot ===========================================
+  setMode("kiosk");
+  Adapter.init().then(loadData).catch(loadData);
+})();
+
+</script>

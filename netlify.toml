@@ -1,7 +1,9 @@
-# Publishes the PatchitUP dashboard. The build step copies the single source
-# (dashboard/index.html) into the publish dir so there's one file to maintain.
+# Publishes the PatchitUP location technician dashboard. The build copies the
+# front-end (dashboard/technician-dashboard.html) to the publish root as
+# index.html, plus the brand assets it references. The former corporate board
+# (dashboard/index.html) is kept in-repo for reference but is no longer served.
 [build]
-  command = "mkdir -p site && cp dashboard/index.html site/index.html"
+  command = "mkdir -p site/assets && cp dashboard/technician-dashboard.html site/index.html && cp dashboard/assets/* site/assets/"
   publish = "site"
 
 [functions]
