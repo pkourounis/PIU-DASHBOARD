@@ -63,16 +63,27 @@
     const c=$("#content");
     if(!currentLocId){ c.innerHTML=`<div class="panel"><div class="empty">Select or add a location to begin.</div></div>`; return; }
     const loc=locations.find(l=>l.id===currentLocId)||{};
+    let hasCreds=false;
+    if(isSuper){ try{ const {data}=await SB.rpc('location_has_credentials',{p_location_id:loc.id}); hasCreds=!!data; }catch(_){} }
+    const step1Done = !isSuper || (!!loc.name && !!loc.st_tenant_id && !!loc.ghl_location_id && hasCreds);
+    if(isSuper && !step1Done) tab='conn';                 // locked to Step 1 until complete
+    const locked = isSuper && !step1Done;
+    const lk = locked ? 'class="locked" data-locked="1"' : '';
     const tabs=`<div class="tabs" id="locTabs">
       ${isSuper?`<button data-tab="conn" class="${tab==='conn'?'on':''}">1 · Connect</button>`:''}
-      <button data-tab="goals" class="${tab==='goals'?'on':''}">${isSuper?'2 · ':''}Goals</button>
-      <button data-tab="techs" class="${tab==='techs'?'on':''}">${isSuper?'3 · ':''}Technicians</button></div>`;
+      <button data-tab="goals" ${locked?lk:`class="${tab==='goals'?'on':''}"`}>${isSuper?'2 · ':''}Goals</button>
+      <button data-tab="techs" ${locked?lk:`class="${tab==='techs'?'on':''}"`}>${isSuper?'3 · ':''}Technicians</button></div>`;
     const connected = !!loc.st_tenant_id;
     c.innerHTML=`<div class="panel"><h2>${esc(loc.name||'Location')}</h2>
-      <div class="desc">${esc(loc.region||'')}${connected?` · ServiceTitan tenant ${esc(loc.st_tenant_id)}`:' · ServiceTitan not connected'}${isSuper?' &nbsp;·&nbsp; Set it up in three steps: <b>1</b> connect, <b>2</b> goals, <b>3</b> technicians.':''}</div>
+      <div class="desc">${esc(loc.region||'')}${connected?` · ServiceTitan tenant ${esc(loc.st_tenant_id)}`:' · ServiceTitan not connected'}${isSuper?(step1Done?' &nbsp;·&nbsp; <span style="color:var(--good)">Setup complete ✓</span>':' &nbsp;·&nbsp; Finish <b>Step 1</b> to unlock Goals &amp; Technicians.'):''}</div>
       ${tabs}<div id="tabBody"></div></div>`;
-    $("#locTabs").addEventListener("click",e=>{ const b=e.target.closest("button"); if(!b)return; tab=b.dataset.tab; renderLocation(); });
-    if(tab==='goals') renderGoals(loc); else if(tab==='techs') renderTechs(loc); else if(isSuper) renderConn(loc); else { tab='goals'; renderGoals(loc); }
+    $("#locTabs").addEventListener("click",e=>{ const b=e.target.closest("button"); if(!b)return;
+      if(b.dataset.locked){ alert('Finish Step 1 first — location name, ServiceTitan tenant id + credentials, and the GoHighLevel location id.'); return; }
+      tab=b.dataset.tab; renderLocation(); });
+    if(tab==='goals'&&!locked) renderGoals(loc);
+    else if(tab==='techs'&&!locked) renderTechs(loc);
+    else if(isSuper) renderConn(loc, {name:!!loc.name, tenant:!!loc.st_tenant_id, ghl:!!loc.ghl_location_id, creds:hasCreds});
+    else renderGoals(loc);
   }
 
   // ------------------------------------------------------ Goals tab
@@ -113,21 +124,24 @@
     let rows=[]; try{ const {data}=await SB.from('technician_meta').select('*').eq('location_id',loc.id).order('name'); rows=data||[]; }catch(_){}
     const discOpts=v=>['','D','I','S','C'].map(o=>`<option value="${o}" ${o===(v||'')?'selected':''}>${o||'—'}</option>`).join('');
     const tr=r=>`<tr data-id="${r.id||''}">
+      <td style="text-align:center"><input type="checkbox" class="chk" data-f="display" ${r.display!==false?'checked':''} title="Show on leaderboard"></td>
       <td><input data-f="name" value="${esc(r.name||'')}" placeholder="Full name"></td>
       <td><input data-f="st_tech_id" value="${esc(r.st_tech_id||'')}" placeholder="ST id (optional)"></td>
       <td><input data-f="title" value="${esc(r.title||'')}" placeholder="Title"></td>
       <td><select data-f="disc">${discOpts(r.disc)}</select></td>
       <td><input data-f="photo_url" value="${esc(r.photo_url||'')}" placeholder="Photo URL (optional)"></td>
       <td style="white-space:nowrap"><button class="btn" data-action="saveTech">Save</button>${r.id?` <button class="btn danger" data-action="delTech">✕</button>`:''}</td></tr>`;
-    body.innerHTML=`<p class="hint" style="margin:0 0 14px">Step 3 — once ServiceTitan is connected, your technicians are pulled in automatically with their photos and metrics. Here you add only what ServiceTitan doesn't store: <b>Title</b>, <b>DISC letter</b>, and a photo <i>only if</i> ServiceTitan has none. Match to ServiceTitan by ST id when set, otherwise by exact name.</p>
-      <div class="tbl-scroll"><table class="tbl"><thead><tr><th>Name</th><th>ST id</th><th>Title</th><th>DISC</th><th>Photo URL</th><th></th></tr></thead>
+    body.innerHTML=`<p class="hint" style="margin:0 0 14px">Step 3 — once ServiceTitan is connected, your technicians are pulled in automatically with their photos and metrics. Tick <b>Show</b> for the ones to display on the leaderboard &amp; scorecards. Here you also add what ServiceTitan doesn't store: <b>Title</b>, <b>DISC letter</b>, and a photo <i>only if</i> ServiceTitan has none. Match by ST id when set, otherwise by exact name.</p>
+      <div class="tbl-scroll"><table class="tbl"><thead><tr><th>Show</th><th>Name</th><th>ST id</th><th>Title</th><th>DISC</th><th>Photo URL</th><th></th></tr></thead>
       <tbody id="techBody">${rows.map(tr).join('')}${tr({})}</tbody></table></div>
       <div class="savemsg" id="techMsg" style="margin-top:10px"></div>`;
   }
   function techRowData(trEl){
     const g=f=>{ const el=trEl.querySelector(`[data-f="${f}"]`); return el?el.value.trim():''; };
+    const chk=trEl.querySelector('[data-f="display"]');
     return { id:trEl.dataset.id||null, location_id:currentLocId, name:g('name')||null, st_tech_id:g('st_tech_id')||null,
-             title:g('title')||null, disc:g('disc')||null, photo_url:g('photo_url')||null, updated_at:new Date().toISOString() };
+             title:g('title')||null, disc:g('disc')||null, photo_url:g('photo_url')||null,
+             display: chk?chk.checked:true, updated_at:new Date().toISOString() };
   }
   async function saveTech(trEl){
     const rec=techRowData(trEl); const msg=$("#techMsg"); msg.textContent='Saving…'; msg.style.color='var(--ink-3)';
@@ -144,10 +158,13 @@
   }
 
   // ------------------------------------------------------ Connection tab (super)
-  function renderConn(loc){
+  function renderConn(loc, req){
+    req = req || {name:!!loc.name, tenant:!!loc.st_tenant_id, ghl:!!loc.ghl_location_id, creds:false};
+    const mk=(ok,label)=>`<span style="color:${ok?'var(--good)':'var(--ink-3)'}">${ok?'✓':'○'} ${label}</span>`;
     const body=$("#tabBody");
     body.innerHTML=`
-      <p class="hint" style="margin:0 0 16px">Step 1 — set up the location, then connect <b>ServiceTitan</b> (revenue, sales, technicians &amp; memberships) and <b>GoHighLevel</b> (Google reviews). After ServiceTitan is connected, the technicians show up in step 3.</p>
+      <p class="hint" style="margin:0 0 10px">Step 1 — set up the location, then connect <b>ServiceTitan</b> (revenue, sales, technicians &amp; memberships) and <b>GoHighLevel</b> (Google reviews). After ServiceTitan is connected, the technicians show up in step 3.</p>
+      <div class="hint" style="margin:0 0 16px;display:flex;gap:16px;flex-wrap:wrap">Required to unlock steps 2 &amp; 3: ${mk(req.name,'Location name')} ${mk(req.tenant,'ServiceTitan tenant id')} ${mk(req.creds,'ServiceTitan credentials')} ${mk(req.ghl,'GoHighLevel id')}</div>
       <div class="grid2">
         <div class="field"><label>Location name</label><input id="c_name" value="${esc(loc.name||'')}"><span class="hint">The franchise location, e.g. "Nassau County".</span></div>
         <div class="field"><label>Code</label><input id="c_code" value="${esc(loc.code||'')}"><span class="hint">Short tag, e.g. "NC". Optional.</span></div>
@@ -158,7 +175,8 @@
         <div class="field"><label>GoHighLevel location id</label><input id="c_ghl" value="${esc(loc.ghl_location_id||'')}"><span class="hint">The location's GoHighLevel sub-account id — used to pull its Google review rating &amp; count. (A Google Analytics property ID can't provide reviews.)</span></div>
         <div class="field"><label>Active</label><select id="c_active"><option value="true" ${loc.is_active?'selected':''}>Yes</option><option value="false" ${!loc.is_active?'selected':''}>No</option></select><span class="hint">"No" hides the location without deleting it.</span></div>
       </div>
-      <div class="row-actions"><button class="btn" data-action="saveLoc">Save location</button><span class="savemsg" id="locMsg"></span></div>
+      <div class="row-actions"><button class="btn" data-action="saveLoc">Save location</button><span class="savemsg" id="locMsg"></span>
+        <button class="btn danger" data-action="deleteLocation" style="margin-left:auto">Delete location</button></div>
       <hr style="border:0;border-top:1px solid var(--border);margin:22px 0">
       <h2 style="font-size:16px;margin:0 0 4px">ServiceTitan credentials</h2>
       <p class="hint">Client id + secret are stored write-only — they're never shown in the browser again. Leave blank to keep the current secret.</p>
@@ -175,15 +193,22 @@
     const msg=$("#locMsg"); msg.textContent='Saving…'; msg.style.color='var(--ink-3)';
     const {error}=await SB.from('locations').update(rec).eq('id',currentLocId);
     if(error){ msg.textContent=error.message; msg.style.color='var(--bad)'; return; }
-    msg.textContent='Saved ✓'; msg.style.color='var(--good)'; await loadLocations(); renderSide();
-    const loc=locations.find(l=>l.id===currentLocId); $("#content").querySelector('h2').textContent=loc.name;
+    msg.textContent='Saved ✓'; msg.style.color='var(--good)'; await loadLocations(); renderSide(); renderLocation();
+  }
+  async function deleteLocation(){
+    const loc=locations.find(l=>l.id===currentLocId); if(!loc) return;
+    if(!confirm(`Delete "${loc.name}" and all of its goals, technicians, credentials and access? This cannot be undone.`)) return;
+    const {error}=await SB.from('locations').delete().eq('id',currentLocId);
+    if(error){ alert(error.message); return; }
+    currentLocId=null; await loadLocations(); if(locations.length) currentLocId=locations[0].id;
+    view='location'; tab='conn'; render();
   }
   async function saveCreds(){
     const cid=$("#c_cid").value.trim(), secret=$("#c_secret").value.trim();
     const msg=$("#credMsg"); if(!cid && !secret){ msg.textContent='Enter a client id and secret'; msg.style.color='var(--bad)'; return; }
     msg.textContent='Saving…'; msg.style.color='var(--ink-3)';
     const {error}=await SB.rpc('save_location_credentials',{p_location_id:currentLocId,p_client_id:cid,p_client_secret:secret});
-    if(error){ msg.textContent=error.message; msg.style.color='var(--bad)'; } else { msg.textContent='Saved ✓'; msg.style.color='var(--good)'; $("#c_cid").value=''; $("#c_secret").value=''; }
+    if(error){ msg.textContent=error.message; msg.style.color='var(--bad)'; } else { $("#c_cid").value=''; $("#c_secret").value=''; renderLocation(); }
   }
   async function addLocation(){
     const name=prompt('New location name (e.g. Suffolk County):'); if(!name) return;
@@ -202,7 +227,8 @@
         <div class="field"><label>Role</label><select id="u_role"><option value="franchisee">Franchisee</option><option value="super_admin">Super Admin</option></select></div>
         <div class="field"><label>Give access to location</label><select id="u_loc"><option value="">— choose a location —</option>${locations.map(l=>`<option value="${esc(l.id)}">${esc(l.name)}</option>`).join('')}</select><span class="hint">Franchisees need at least one location. Super-admins get all.</span></div>
       </div>
-      <div class="row-actions"><button class="btn" data-action="createUser">Create user</button><span class="savemsg" id="uNewMsg"></span></div>
+      <div class="row-actions"><button class="btn" data-action="createUser">Create user &amp; send login instructions</button><span class="savemsg" id="uNewMsg"></span></div>
+      <div id="uInstr"></div>
       <hr style="border:0;border-top:1px solid var(--border);margin:22px 0">
       <div id="usersBody"><div class="empty">Loading…</div></div></div>`;
     let profs=[],access=[]; try{ ({data:profs}=await SB.from('profiles').select('*').order('email')); }catch(_){}
@@ -228,22 +254,44 @@
     if(chk.checked){ ({error}=await SB.from('location_access').insert({user_id:user,location_id:loc})); }
     else { ({error}=await SB.from('location_access').delete().eq('user_id',user).eq('location_id',loc)); }
     if(error){ msg.textContent=error.message; msg.style.color='var(--bad)'; chk.checked=!chk.checked; } else { msg.textContent='Saved ✓'; msg.style.color='var(--good)'; } }
+  function instructionsText(email, pw, role, locName){
+    const url='https://patchitup-dashboard.netlify.app';
+    const intro = role==='super_admin' ? "You've been given super-admin access to the PatchitUP Technician Dashboard."
+      : `You've been given access to the PatchitUP Technician Dashboard for ${locName||'your location'}.`;
+    return `Welcome to the PatchitUP Technician Dashboard!\n\n${intro}\n\nIt's your live leaderboard and technician scorecards — revenue, sales, close rate and job averages for each tech, plus your company goals — pulled from ServiceTitan. Run it full-screen on a shop TV, or open it on your phone or computer.\n\nHow to sign in:\n1. Go to ${url}\n2. Click the "Password" tab.\n3. Email: ${email}\n4. Password: ${pw}\n5. Click "Sign in", then change your password.\n\nQuestions? Just reply to this email.`;
+  }
+  function showInstructions(email, pw, role, locName){
+    const el=$("#uInstr"); if(!el) return;
+    const txt=instructionsText(email,pw,role,locName);
+    el.innerHTML=`<div class="field" style="margin-top:14px"><label>Login instructions — email isn't connected yet, so copy &amp; send these</label>
+      <textarea id="uInstrTxt" style="width:100%;min-height:170px;font-family:inherit;font-size:13px;padding:10px;border:1px solid var(--border);border-radius:10px;background:var(--panel-2);color:var(--ink)">${esc(txt)}</textarea></div>
+      <div class="row-actions"><button class="btn ghost" data-action="copyInstr">Copy to clipboard</button></div>`;
+  }
   async function createUser(){
     const email=($("#u_email").value||'').trim(), pw=$("#u_pw").value||'', role=$("#u_role").value, loc=$("#u_loc").value||null;
-    const msg=$("#uNewMsg");
+    const locName=(locations.find(l=>l.id===loc)||{}).name||'';
+    const msg=$("#uNewMsg"); const ui=$("#uInstr"); if(ui) ui.innerHTML='';
     if(!email || pw.length<8){ msg.textContent='Enter an email and a password of at least 8 characters'; msg.style.color='var(--bad)'; return; }
     if(role==='franchisee' && !loc){ msg.textContent='Pick a location for this franchisee'; msg.style.color='var(--bad)'; return; }
     msg.textContent='Creating…'; msg.style.color='var(--ink-3)';
     const {error}=await SB.rpc('admin_create_user',{p_email:email,p_password:pw,p_role:role,p_location_id:loc});
-    if(error){ msg.textContent=error.message; msg.style.color='var(--bad)'; }
-    else { msg.textContent='User created ✓'; msg.style.color='var(--good)'; $("#u_email").value=''; $("#u_pw").value=''; renderUsers(); }
+    if(error){ msg.textContent=error.message; msg.style.color='var(--bad)'; return; }
+    // created — try to email the instructions
+    msg.textContent='User created ✓ — sending instructions…'; msg.style.color='var(--ink-3)';
+    try{
+      const {data,error:e2}=await SB.functions.invoke('send-welcome',{body:{email,password:pw,role,locationName:locName}});
+      if(e2) throw e2;
+      if(data&&data.sent){ msg.textContent='User created and login instructions emailed ✓'; msg.style.color='var(--good)'; }
+      else { msg.textContent='User created ✓ — email isn’t connected yet, so copy the instructions below to send.'; msg.style.color='var(--warn)'; showInstructions(email,pw,role,locName); }
+    }catch(_){ msg.textContent='User created ✓ — couldn’t send email; copy the instructions below.'; msg.style.color='var(--warn)'; showInstructions(email,pw,role,locName); }
+    $("#u_email").value=''; $("#u_pw").value='';
   }
 
   // ------------------------------------------------------ event delegation
   document.addEventListener('click', e=>{
     const b=e.target.closest('[data-action]'); if(!b) return;
     const a=b.dataset.action;
-    if(a==='pickLoc'){ currentLocId=b.dataset.id; view='location'; render(); }
+    if(a==='pickLoc'){ currentLocId=b.dataset.id; view='location'; tab='conn'; render(); }
     else if(a==='usersView'){ view='users'; render(); }
     else if(a==='addLocation') addLocation();
     else if(a==='saveGoals') saveGoals();
@@ -251,7 +299,9 @@
     else if(a==='delTech') delTech(b.closest('tr'));
     else if(a==='saveLoc') saveLoc();
     else if(a==='saveCreds') saveCreds();
+    else if(a==='deleteLocation') deleteLocation();
     else if(a==='createUser') createUser();
+    else if(a==='copyInstr'){ const ta=$("#uInstrTxt"); if(ta){ ta.select(); try{ document.execCommand('copy'); }catch(_){} navigator.clipboard&&navigator.clipboard.writeText(ta.value).catch(()=>{}); b.textContent='Copied ✓'; setTimeout(()=>b.textContent='Copy to clipboard',1500); } }
   });
   document.addEventListener('change', e=>{
     const b=e.target.closest('[data-action]'); if(!b) return;

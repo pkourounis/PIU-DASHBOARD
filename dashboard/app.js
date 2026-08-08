@@ -111,7 +111,8 @@
     const byId={}, byName={};
     (ov.techMeta||[]).forEach(m=>{ if(m.st_tech_id) byId[m.st_tech_id]=m; if(m.name) byName[m.name.toLowerCase()]=m; });
     return base.map(t=>{ const m=(t.id&&byId[t.id])||byName[(t.name||'').toLowerCase()]||{};
-      return {...t, title:m.title||t.title, disc:m.disc||t.disc, photo:m.photo_url||t.photo}; });
+      return {...t, title:m.title||t.title, disc:m.disc||t.disc, photo:m.photo_url||t.photo, _hidden:(m.display===false)}; })
+      .filter(t=>!t._hidden);   // technicians unticked in admin are hidden from the board
   }
   function buildLocation(name, ov, live){
     const g = ov && ov.goals;
