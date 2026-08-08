@@ -179,10 +179,11 @@
         <button class="btn danger" data-action="deleteLocation" style="margin-left:auto">Delete location</button></div>
       <hr style="border:0;border-top:1px solid var(--border);margin:22px 0">
       <h2 style="font-size:16px;margin:0 0 4px">ServiceTitan credentials</h2>
-      <p class="hint">Client id + secret are stored write-only — they're never shown in the browser again. Leave blank to keep the current secret.</p>
+      <p class="hint">Client id, secret + app key are stored write-only — they're never shown in the browser again. Leave a field blank to keep its current value.</p>
       <div class="grid2" style="margin-top:12px">
         <div class="field"><label>Client id</label><input id="c_cid" placeholder="cid.xxxxx"></div>
         <div class="field"><label>Client secret</label><input id="c_secret" type="password" placeholder="cs1.xxxxx"></div>
+        <div class="field"><label>App key (ST-App-Key)</label><input id="c_appkey" type="password" placeholder="ak1.xxxxx"><span class="hint">From your ServiceTitan app registration. Same value ServiceTitan sends in the "ST-App-Key" header.</span></div>
       </div>
       <div class="row-actions"><button class="btn" data-action="saveCreds">Save credentials</button><span class="savemsg" id="credMsg"></span></div>`;
   }
@@ -204,11 +205,11 @@
     view='location'; tab='conn'; render();
   }
   async function saveCreds(){
-    const cid=$("#c_cid").value.trim(), secret=$("#c_secret").value.trim();
-    const msg=$("#credMsg"); if(!cid && !secret){ msg.textContent='Enter a client id and secret'; msg.style.color='var(--bad)'; return; }
+    const cid=$("#c_cid").value.trim(), secret=$("#c_secret").value.trim(), appkey=$("#c_appkey").value.trim();
+    const msg=$("#credMsg"); if(!cid && !secret && !appkey){ msg.textContent='Enter a client id, secret and app key'; msg.style.color='var(--bad)'; return; }
     msg.textContent='Saving…'; msg.style.color='var(--ink-3)';
-    const {error}=await SB.rpc('save_location_credentials',{p_location_id:currentLocId,p_client_id:cid,p_client_secret:secret});
-    if(error){ msg.textContent=error.message; msg.style.color='var(--bad)'; } else { $("#c_cid").value=''; $("#c_secret").value=''; renderLocation(); }
+    const {error}=await SB.rpc('save_location_credentials',{p_location_id:currentLocId,p_client_id:cid,p_client_secret:secret,p_app_key:appkey});
+    if(error){ msg.textContent=error.message; msg.style.color='var(--bad)'; } else { $("#c_cid").value=''; $("#c_secret").value=''; $("#c_appkey").value=''; renderLocation(); }
   }
   async function addLocation(){
     const name=prompt('New location name (e.g. Suffolk County):'); if(!name) return;

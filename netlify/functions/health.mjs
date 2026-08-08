@@ -17,7 +17,8 @@ export default async () => {
   }
   const hasData = tenants.some((t) => t.days > 0);
   // ok drives the dashboard's auto-switch to live: only flip once real data is stored.
-  return Response.json({ ok: isConfigured && hasData, configured: isConfigured, hasData, env: c.env, appKeySet: !!c.appKey, lastSyncAt: status?.at || null, tenants });
+  const appKeySet = c.tenants.length > 0 ? c.tenants.every((t) => t.appKey || c.appKey) : !!c.appKey;
+  return Response.json({ ok: isConfigured && hasData, configured: isConfigured, hasData, env: c.env, appKeySet, lastSyncAt: status?.at || null, tenants });
 };
 
 export const config = { path: '/api/health' };

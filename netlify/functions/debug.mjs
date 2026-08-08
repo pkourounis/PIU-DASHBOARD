@@ -23,7 +23,7 @@ export default async (req, context) => {
   if (!t) return Response.json({ error: 'no tenant' });
 
   const days = Number(new URL(req.url).searchParams.get('days') || 90);
-  const client = new ServiceTitanClient({ env: c.env, appKey: c.appKey });
+  const client = new ServiceTitanClient({ env: t.env || c.env, appKey: t.appKey || c.appKey });
   const tenant = { tenantId: String(t.tenantId), clientId: t.clientId, clientSecret: t.clientSecret };
   const to = new Date(), from = new Date(to.getTime() - days * 86400000);
 

@@ -6,10 +6,12 @@ import { readSnapshot, mergeDays } from './blobStore.mjs';
 const DAY = 86400000;
 
 export async function syncAll(cfg, opts = {}) {
-  const client = new ServiceTitanClient({ env: cfg.env, appKey: cfg.appKey });
   const results = [];
   for (const t of cfg.tenants) {
     try {
+      // Each location carries its own app key + env (entered in the admin); fall back to the
+      // shared ST_APP_KEY / ST_ENV only when a field was left blank.
+      const client = new ServiceTitanClient({ env: t.env || cfg.env, appKey: t.appKey || cfg.appKey });
       const tenant = { tenantId: String(t.tenantId), clientId: t.clientId, clientSecret: t.clientSecret };
       const existing = await readSnapshot(tenant.tenantId);
       const hasHistory = existing.updatedAt && Object.keys(existing.days || {}).length > 0;
