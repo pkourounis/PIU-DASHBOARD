@@ -1,0 +1,24 @@
+name: Deploy to Netlify
+
+# Builds and deploys the PatchitUP dashboard to Netlify from GitHub's runners
+# (which can reach Netlify). Requires one repo secret: NETLIFY_AUTH_TOKEN.
+# The site id is public and hard-coded below.
+
+on:
+  push:
+    branches: [claude/location-technician-dashboard-bhofb0, main]
+  workflow_dispatch: {}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Build and deploy to Netlify
+        run: npx --yes netlify-cli@17 deploy --build --prod --site="$NETLIFY_SITE_ID" --auth="$NETLIFY_AUTH_TOKEN"
+        env:
+          NETLIFY_SITE_ID: 6f67638d-0ed4-49a0-a1a0-3e5e3f8e861c
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
