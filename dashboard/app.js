@@ -282,6 +282,7 @@
   $(".stage").addEventListener("mouseenter",()=>{ if(kmode==="kiosk")cancelAnimationFrame(raf); });
   $(".stage").addEventListener("mouseleave",()=>{ if(kmode==="kiosk"&&playing)restart(); });
   $("#theme").addEventListener("click",()=>{ const cur=document.documentElement.getAttribute("data-theme"); const sysDark=window.matchMedia("(prefers-color-scheme: dark)").matches; document.documentElement.setAttribute("data-theme", cur?(cur==="dark"?"light":"dark"):(sysDark?"light":"dark")); });
+  const fsBtn=$("#fs"); fsBtn&&fsBtn.addEventListener("click",()=>{ try{ if(document.fullscreenElement){ document.exitFullscreen(); } else { const el=document.documentElement; (el.requestFullscreen||el.webkitRequestFullscreen||el.msRequestFullscreen).call(el); } }catch(_){} });
   function tick(){ const el=$("#clock"); if(el) el.textContent=new Date().toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"}); }
   setInterval(tick,1000); tick();
   setInterval(()=>{ if(Adapter.live) Adapter.preload().then(loadData).catch(()=>{}); }, 15*60*1000);
