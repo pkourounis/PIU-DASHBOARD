@@ -2,7 +2,7 @@ import { getConfig, configured, publicTenant } from './_shared/config.mjs';
 import { readSnapshot, readStatus } from './_shared/blobStore.mjs';
 
 export default async () => {
-  const c = getConfig();
+  const c = await getConfig();
   const isConfigured = configured(c);
   const status = await readStatus().catch(() => null);
   const byName = {};

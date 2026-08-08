@@ -5,9 +5,9 @@ import { syncAll } from './_shared/syncCore.mjs';
 import { writeStatus } from './_shared/blobStore.mjs';
 
 export default async (req) => {
-  const c = getConfig();
+  const c = await getConfig();
   if (!configured(c)) {
-    console.log('ServiceTitan not configured (set ST_APP_KEY + TENANTS_JSON).');
+    console.log('ServiceTitan not configured (set ST_APP_KEY and connect a location in Supabase, or set TENANTS_JSON).');
     await writeStatus({ at: new Date().toISOString(), error: 'not configured', results: [] });
     return;
   }

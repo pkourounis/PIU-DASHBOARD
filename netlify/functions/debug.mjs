@@ -12,7 +12,7 @@ const validDate = (d) => { if (!d) return false; const t = Date.parse(d); return
 const jobIdOf = (e) => e.jobId ?? e.job?.id ?? e.id;
 
 export default async (req, context) => {
-  const c = getConfig();
+  const c = await getConfig();
   if (!configured(c)) return Response.json({ error: 'not configured' });
   // Match by tenantId, or by a friendly code/name (case-insensitive substring) so you can hit
   // /api/debug/charlotte instead of memorizing tenant ids.
