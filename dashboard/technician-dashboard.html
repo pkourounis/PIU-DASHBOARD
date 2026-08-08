@@ -402,13 +402,13 @@
     <h1>Technician Dashboard</h1>
     <p class="login-sub">Sign in to view your location.</p>
     <div class="login-tabs" id="loginTabs">
-      <button data-tab="magic" class="on">Email link</button>
-      <button data-tab="password">Password</button>
+      <button data-tab="magic">Email link</button>
+      <button data-tab="password" class="on">Password</button>
     </div>
     <form id="loginForm">
       <input type="email" id="loginEmail" placeholder="you@company.com" autocomplete="email" required />
-      <input type="password" id="loginPassword" placeholder="Password" autocomplete="current-password" style="display:none" />
-      <button type="submit" class="login-btn" id="loginSubmit">Send magic link</button>
+      <input type="password" id="loginPassword" placeholder="Password" autocomplete="current-password" />
+      <button type="submit" class="login-btn" id="loginSubmit">Sign in</button>
     </form>
     <div class="login-msg" id="loginMsg"></div>
     <button class="login-demo" id="loginDemo">View sample dashboard →</button>

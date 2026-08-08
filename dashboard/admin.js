@@ -10,7 +10,7 @@
   let locations=[], currentLocId=null, view='location', tab='goals';
 
   // ------------------------------------------------------ auth / login
-  let loginTab='magic';
+  let loginTab='password';
   function showLogin(v){ $("#loginOverlay").hidden=!v; $("#wrap").hidden=v; }
   function loginMsg(t,bad){ const el=$("#loginMsg"); el.textContent=t||''; el.style.color=bad?'var(--bad)':'var(--good)'; }
   function wireLogin(){

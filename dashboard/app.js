@@ -303,7 +303,7 @@
   }
   function showLogin(show){ const el=$("#loginOverlay"); if(el) el.hidden=!show; }
   function loginMsg(t,bad){ const el=$("#loginMsg"); if(el){ el.textContent=t||''; el.style.color=bad?'var(--bad)':'var(--good)'; } }
-  let loginTab='magic';
+  let loginTab='password';
   function wireLogin(){
     if(!$("#loginOverlay")) return;
     $("#loginTabs")&&$("#loginTabs").addEventListener("click",e=>{ const b=e.target.closest("button"); if(!b)return; loginTab=b.dataset.tab;
