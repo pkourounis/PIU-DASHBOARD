@@ -8,6 +8,7 @@
 
   let session=null, profile=null, isSuper=false;
   let locations=[], currentLocId=null, view='location', tab='goals';
+  let syncTimer=null;
 
   // ------------------------------------------------------ auth / login
   let loginTab='password';
@@ -185,7 +186,13 @@
         <div class="field"><label>Client secret</label><input id="c_secret" type="password" placeholder="cs1.xxxxx"></div>
         <div class="field"><label>App key (ST-App-Key)</label><input id="c_appkey" type="password" placeholder="ak1.xxxxx"><span class="hint">From your ServiceTitan app registration. Same value ServiceTitan sends in the "ST-App-Key" header.</span></div>
       </div>
-      <div class="row-actions"><button class="btn" data-action="saveCreds">Save credentials</button><span class="savemsg" id="credMsg"></span></div>`;
+      <div class="row-actions"><button class="btn" data-action="saveCreds">Save credentials</button><span class="savemsg" id="credMsg"></span></div>
+      <hr style="border:0;border-top:1px solid var(--border);margin:22px 0">
+      <h2 style="font-size:16px;margin:0 0 4px">ServiceTitan data</h2>
+      <p class="hint">Once the tenant id + credentials above are saved, pull the data. The first sync backfills history and can take a minute or two; after that it refreshes automatically every hour.</p>
+      <div class="row-actions"><button class="btn" data-action="syncNow">Sync ServiceTitan now</button><span class="savemsg" id="syncMsg"></span></div>
+      <div class="hint" id="syncHealth" style="margin-top:8px"></div>`;
+    refreshSyncHealth();
   }
   async function saveLoc(){
     const rec={ name:$("#c_name").value.trim(), code:$("#c_code").value.trim()||null, region:$("#c_region").value.trim()||null,
@@ -210,6 +217,38 @@
     msg.textContent='Saving…'; msg.style.color='var(--ink-3)';
     const {error}=await SB.rpc('save_location_credentials',{p_location_id:currentLocId,p_client_id:cid,p_client_secret:secret,p_app_key:appkey});
     if(error){ msg.textContent=error.message; msg.style.color='var(--bad)'; } else { $("#c_cid").value=''; $("#c_secret").value=''; $("#c_appkey").value=''; renderLocation(); }
+  }
+  // Kick off the backend sync (Netlify background function) and watch the stored data land.
+  async function syncNow(){
+    const msg=$("#syncMsg"); msg.textContent='Starting sync…'; msg.style.color='var(--ink-3)';
+    try{
+      const r=await fetch('/api/sync',{method:'POST',cache:'no-store'});
+      if(r.status>=400) throw new Error('HTTP '+r.status);
+      msg.textContent='Sync started — pulling from ServiceTitan. This can take a minute or two.'; msg.style.color='var(--good)';
+      pollSyncHealth(0);
+    }catch(e){ msg.textContent='Could not start the sync ('+(e.message||e)+'). Is the backend deployed?'; msg.style.color='var(--bad)'; }
+  }
+  // One-shot read of current sync state for this location (shown when the Connect tab opens).
+  function refreshSyncHealth(){ if(syncTimer){ clearTimeout(syncTimer); syncTimer=null; } pollSyncHealth(0, true); }
+  async function pollSyncHealth(n, once){
+    const el=$("#syncHealth"); if(!el) return;   // navigated away → stop the loop
+    let h=null; try{ h=await (await fetch('/api/health',{cache:'no-store'})).json(); }catch(_){ }
+    if(el!==$("#syncHealth")) return;
+    if(!h){ el.textContent='Sync status unavailable (backend not reachable yet).'; return; }
+    const loc=locations.find(l=>l.id===currentLocId)||{};
+    const t=(h.tenants||[]).find(x=>String(x.tenant)===String(loc.st_tenant_id));
+    if(t){
+      const when=h.lastSyncAt?new Date(h.lastSyncAt).toLocaleString():'not yet';
+      const days=t.days||0;
+      el.innerHTML=`Stored days: <b>${days}</b> &nbsp;·&nbsp; last run: ${esc(t.lastMode||'—')} &nbsp;·&nbsp; last sync: ${esc(when)}`
+        + (t.lastError?` &nbsp;·&nbsp; <span style="color:var(--bad)">error: ${esc(t.lastError)}</span>`:'')
+        + (days>0?` &nbsp;·&nbsp; <span style="color:var(--good)">data is live ✓</span>`:'');
+      if(days>0) return;   // done — stop polling
+    } else {
+      el.textContent = h.configured ? 'Backend is configured — waiting for the first data to land…'
+        : 'Backend not fully connected yet — save the tenant id + all three credentials, then Sync.';
+    }
+    if(!once && n<18){ syncTimer=setTimeout(()=>pollSyncHealth(n+1), 10000); }   // ~3 min of polling
   }
   async function addLocation(){
     const name=prompt('New location name (e.g. Suffolk County):'); if(!name) return;
@@ -300,6 +339,7 @@
     else if(a==='delTech') delTech(b.closest('tr'));
     else if(a==='saveLoc') saveLoc();
     else if(a==='saveCreds') saveCreds();
+    else if(a==='syncNow') syncNow();
     else if(a==='deleteLocation') deleteLocation();
     else if(a==='createUser') createUser();
     else if(a==='copyInstr'){ const ta=$("#uInstrTxt"); if(ta){ ta.select(); try{ document.execCommand('copy'); }catch(_){} navigator.clipboard&&navigator.clipboard.writeText(ta.value).catch(()=>{}); b.textContent='Copied ✓'; setTimeout(()=>b.textContent='Copy to clipboard',1500); } }
