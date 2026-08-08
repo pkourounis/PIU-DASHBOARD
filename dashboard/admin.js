@@ -64,40 +64,44 @@
     if(!currentLocId){ c.innerHTML=`<div class="panel"><div class="empty">Select or add a location to begin.</div></div>`; return; }
     const loc=locations.find(l=>l.id===currentLocId)||{};
     const tabs=`<div class="tabs" id="locTabs">
-      <button data-tab="goals" class="${tab==='goals'?'on':''}">Goals</button>
-      <button data-tab="techs" class="${tab==='techs'?'on':''}">Technicians</button>
-      ${isSuper?`<button data-tab="conn" class="${tab==='conn'?'on':''}">ServiceTitan &amp; location</button>`:''}</div>`;
-    c.innerHTML=`<div class="panel"><h2>${esc(loc.name||'Location')}</h2><div class="desc">${esc(loc.region||'')}${loc.st_tenant_id?` · ServiceTitan tenant ${esc(loc.st_tenant_id)}`:' · ServiceTitan not connected'}</div>${tabs}<div id="tabBody"></div></div>`;
+      ${isSuper?`<button data-tab="conn" class="${tab==='conn'?'on':''}">1 · Connect</button>`:''}
+      <button data-tab="goals" class="${tab==='goals'?'on':''}">${isSuper?'2 · ':''}Goals</button>
+      <button data-tab="techs" class="${tab==='techs'?'on':''}">${isSuper?'3 · ':''}Technicians</button></div>`;
+    const connected = !!loc.st_tenant_id;
+    c.innerHTML=`<div class="panel"><h2>${esc(loc.name||'Location')}</h2>
+      <div class="desc">${esc(loc.region||'')}${connected?` · ServiceTitan tenant ${esc(loc.st_tenant_id)}`:' · ServiceTitan not connected'}${isSuper?' &nbsp;·&nbsp; Set it up in three steps: <b>1</b> connect, <b>2</b> goals, <b>3</b> technicians.':''}</div>
+      ${tabs}<div id="tabBody"></div></div>`;
     $("#locTabs").addEventListener("click",e=>{ const b=e.target.closest("button"); if(!b)return; tab=b.dataset.tab; renderLocation(); });
-    if(tab==='goals') renderGoals(loc); else if(tab==='techs') renderTechs(loc); else renderConn(loc);
+    if(tab==='goals') renderGoals(loc); else if(tab==='techs') renderTechs(loc); else if(isSuper) renderConn(loc); else { tab='goals'; renderGoals(loc); }
   }
 
   // ------------------------------------------------------ Goals tab
   async function renderGoals(loc){
     const body=$("#tabBody"); body.innerHTML=`<div class="empty">Loading…</div>`;
     let g={}; try{ const {data}=await SB.from('location_goals').select('*').eq('location_id',loc.id).maybeSingle(); g=data||{}; }catch(_){}
+    const per=(id,v)=>`<select id="${id}"><option value="monthly" ${v!=='annual'?'selected':''}>Monthly</option><option value="annual" ${v==='annual'?'selected':''}>Annual</option></select>`;
     body.innerHTML=`
+      <p class="hint" style="margin:0 0 16px">Step 2 — set the <b>targets</b> below. The matching <b>actuals</b> (revenue, close rate, memberships sold, review counts) are pulled automatically from ServiceTitan and GoHighLevel — you don't type them here.</p>
       <div class="grid2">
-        <div class="field"><label>Revenue target ($)</label><input id="g_rev" type="number" value="${g.revenue_target??0}"></div>
-        <div class="field"><label>Close-rate target (%)</label><input id="g_close" type="number" step="1" value="${g.close_rate_target!=null?Math.round(g.close_rate_target*100):65}"></div>
-        <div class="field"><label>Memberships target</label><input id="g_memt" type="number" value="${g.memberships_target??0}"></div>
-        <div class="field"><label>Memberships sold (actual)</label><input id="g_mema" type="number" value="${g.memberships_actual??0}"></div>
-        <div class="field"><label>Google reviews target (this period)</label><input id="g_revwt" type="number" value="${g.reviews_target??0}"></div>
-        <div class="field"><label>Google reviews received (actual)</label><input id="g_revwa" type="number" value="${g.reviews_actual??0}"></div>
-        <div class="field"><label>Google rating (0–5)</label><input id="g_rating" type="number" step="0.1" value="${g.reviews_rating??''}"></div>
-        <div class="field"><label>Total Google reviews</label><input id="g_revtot" type="number" value="${g.reviews_total??''}"></div>
-        <div class="field"><label>Cancellations</label><input id="g_canc" type="number" value="${g.cancellations??0}"></div>
+        <div class="field"><label>Revenue target ($)</label><input id="g_rev" type="number" value="${g.revenue_target??0}"><span class="hint">Actual revenue is pulled from ServiceTitan.</span></div>
+        <div class="field"><label>Revenue goal period</label>${per('g_revper',g.revenue_period)}<span class="hint">Is this a monthly or annual target?</span></div>
+        <div class="field"><label>Close-rate target (%)</label><input id="g_close" type="number" step="1" value="${g.close_rate_target!=null?Math.round(g.close_rate_target*100):65}"><span class="hint">Actual close rate is computed from ServiceTitan opportunities.</span></div>
+        <div class="field"><label>Google reviews target</label><input id="g_revwt" type="number" value="${g.reviews_target??0}"><span class="hint">Rating &amp; review counts pull from GoHighLevel (Google).</span></div>
+        <div class="field"><label>Reviews goal period</label>${per('g_revwper',g.reviews_period)}<span class="hint">e.g. new reviews per month.</span></div>
+        <div class="field"></div>
+        <div class="field"><label>HomeGuard memberships target</label><input id="g_hg" type="number" value="${g.homeguard_target??0}"><span class="hint">Sold count pulls from ServiceTitan.</span></div>
+        <div class="field"><label>Power Partner memberships target</label><input id="g_pp" type="number" value="${g.power_partner_target??0}"><span class="hint">Sold count pulls from ServiceTitan.</span></div>
+        <div class="field"><label>Memberships goal period</label>${per('g_memper',g.memberships_period)}<span class="hint">Membership targets are usually annual.</span></div>
       </div>
       <div class="row-actions"><button class="btn" data-action="saveGoals">Save goals</button><span class="savemsg" id="goalsMsg"></span></div>`;
   }
   async function saveGoals(){
-    const rating=$("#g_rating").value, total=$("#g_revtot").value;
     const rec={ location_id:currentLocId,
-      revenue_target:num($("#g_rev").value), close_rate_target:num($("#g_close").value)/100,
-      memberships_target:num($("#g_memt").value), memberships_actual:num($("#g_mema").value),
-      reviews_target:num($("#g_revwt").value), reviews_actual:num($("#g_revwa").value),
-      reviews_rating:rating===''?null:num(rating), reviews_total:total===''?null:num(total),
-      cancellations:num($("#g_canc").value), updated_at:new Date().toISOString() };
+      revenue_target:num($("#g_rev").value), revenue_period:$("#g_revper").value,
+      close_rate_target:num($("#g_close").value)/100,
+      reviews_target:num($("#g_revwt").value), reviews_period:$("#g_revwper").value,
+      homeguard_target:num($("#g_hg").value), power_partner_target:num($("#g_pp").value),
+      memberships_period:$("#g_memper").value, updated_at:new Date().toISOString() };
     const msg=$("#goalsMsg"); msg.textContent='Saving…'; msg.style.color='var(--ink-3)';
     const {error}=await SB.from('location_goals').upsert(rec,{onConflict:'location_id'});
     if(error){ msg.textContent=error.message; msg.style.color='var(--bad)'; } else { msg.textContent='Saved ✓'; msg.style.color='var(--good)'; }
@@ -115,7 +119,7 @@
       <td><select data-f="disc">${discOpts(r.disc)}</select></td>
       <td><input data-f="photo_url" value="${esc(r.photo_url||'')}" placeholder="Photo URL (optional)"></td>
       <td style="white-space:nowrap"><button class="btn" data-action="saveTech">Save</button>${r.id?` <button class="btn danger" data-action="delTech">✕</button>`:''}</td></tr>`;
-    body.innerHTML=`<p class="hint">Title and DISC are matched to ServiceTitan by ST id when set, otherwise by exact name. Photo falls back to the ServiceTitan headshot when blank.</p>
+    body.innerHTML=`<p class="hint" style="margin:0 0 14px">Step 3 — once ServiceTitan is connected, your technicians are pulled in automatically with their photos and metrics. Here you add only what ServiceTitan doesn't store: <b>Title</b>, <b>DISC letter</b>, and a photo <i>only if</i> ServiceTitan has none. Match to ServiceTitan by ST id when set, otherwise by exact name.</p>
       <div class="tbl-scroll"><table class="tbl"><thead><tr><th>Name</th><th>ST id</th><th>Title</th><th>DISC</th><th>Photo URL</th><th></th></tr></thead>
       <tbody id="techBody">${rows.map(tr).join('')}${tr({})}</tbody></table></div>
       <div class="savemsg" id="techMsg" style="margin-top:10px"></div>`;
@@ -143,19 +147,21 @@
   function renderConn(loc){
     const body=$("#tabBody");
     body.innerHTML=`
+      <p class="hint" style="margin:0 0 16px">Step 1 — set up the location, then connect <b>ServiceTitan</b> (revenue, sales, technicians &amp; memberships) and <b>GoHighLevel</b> (Google reviews). After ServiceTitan is connected, the technicians show up in step 3.</p>
       <div class="grid2">
-        <div class="field"><label>Location name</label><input id="c_name" value="${esc(loc.name||'')}"></div>
-        <div class="field"><label>Code</label><input id="c_code" value="${esc(loc.code||'')}"></div>
-        <div class="field"><label>Region</label><input id="c_region" value="${esc(loc.region||'')}"></div>
-        <div class="field"><label>State</label><input id="c_state" value="${esc(loc.state||'')}"></div>
-        <div class="field"><label>ServiceTitan tenant id</label><input id="c_tenant" value="${esc(loc.st_tenant_id||'')}"></div>
-        <div class="field"><label>ServiceTitan environment</label><select id="c_env"><option value="production" ${loc.st_env!=='integration'?'selected':''}>production</option><option value="integration" ${loc.st_env==='integration'?'selected':''}>integration</option></select></div>
-        <div class="field"><label>Active</label><select id="c_active"><option value="true" ${loc.is_active?'selected':''}>Yes</option><option value="false" ${!loc.is_active?'selected':''}>No</option></select></div>
+        <div class="field"><label>Location name</label><input id="c_name" value="${esc(loc.name||'')}"><span class="hint">The franchise location, e.g. "Nassau County".</span></div>
+        <div class="field"><label>Code</label><input id="c_code" value="${esc(loc.code||'')}"><span class="hint">Short tag, e.g. "NC". Optional.</span></div>
+        <div class="field"><label>Region</label><input id="c_region" value="${esc(loc.region||'')}"><span class="hint">e.g. "Long Island, NY". Optional.</span></div>
+        <div class="field"><label>State</label><input id="c_state" value="${esc(loc.state||'')}"><span class="hint">Two-letter state. Optional.</span></div>
+        <div class="field"><label>ServiceTitan tenant id</label><input id="c_tenant" value="${esc(loc.st_tenant_id||'')}"><span class="hint">The numeric Tenant ID from ServiceTitan.</span></div>
+        <div class="field"><label>ServiceTitan environment</label><select id="c_env"><option value="production" ${loc.st_env!=='integration'?'selected':''}>production</option><option value="integration" ${loc.st_env==='integration'?'selected':''}>integration</option></select><span class="hint">Use "production" for live data; "integration" is ServiceTitan's test sandbox.</span></div>
+        <div class="field"><label>GoHighLevel location id</label><input id="c_ghl" value="${esc(loc.ghl_location_id||'')}"><span class="hint">The location's GoHighLevel sub-account id — used to pull its Google review rating &amp; count. (A Google Analytics property ID can't provide reviews.)</span></div>
+        <div class="field"><label>Active</label><select id="c_active"><option value="true" ${loc.is_active?'selected':''}>Yes</option><option value="false" ${!loc.is_active?'selected':''}>No</option></select><span class="hint">"No" hides the location without deleting it.</span></div>
       </div>
       <div class="row-actions"><button class="btn" data-action="saveLoc">Save location</button><span class="savemsg" id="locMsg"></span></div>
       <hr style="border:0;border-top:1px solid var(--border);margin:22px 0">
       <h2 style="font-size:16px;margin:0 0 4px">ServiceTitan credentials</h2>
-      <p class="hint">Client id + secret are stored write-only — they're never returned to the browser. Leave blank to keep the current secret.</p>
+      <p class="hint">Client id + secret are stored write-only — they're never shown in the browser again. Leave blank to keep the current secret.</p>
       <div class="grid2" style="margin-top:12px">
         <div class="field"><label>Client id</label><input id="c_cid" placeholder="cid.xxxxx"></div>
         <div class="field"><label>Client secret</label><input id="c_secret" type="password" placeholder="cs1.xxxxx"></div>
@@ -164,7 +170,8 @@
   }
   async function saveLoc(){
     const rec={ name:$("#c_name").value.trim(), code:$("#c_code").value.trim()||null, region:$("#c_region").value.trim()||null,
-      state:$("#c_state").value.trim()||null, st_tenant_id:$("#c_tenant").value.trim()||null, st_env:$("#c_env").value, is_active:$("#c_active").value==='true' };
+      state:$("#c_state").value.trim()||null, st_tenant_id:$("#c_tenant").value.trim()||null, st_env:$("#c_env").value,
+      ghl_location_id:$("#c_ghl").value.trim()||null, is_active:$("#c_active").value==='true' };
     const msg=$("#locMsg"); msg.textContent='Saving…'; msg.style.color='var(--ink-3)';
     const {error}=await SB.from('locations').update(rec).eq('id',currentLocId);
     if(error){ msg.textContent=error.message; msg.style.color='var(--bad)'; return; }
@@ -187,7 +194,17 @@
 
   // ------------------------------------------------------ Users & access (super)
   async function renderUsers(){
-    const c=$("#content"); c.innerHTML=`<div class="panel"><h2>Users &amp; access</h2><div class="desc">People sign in themselves (email link); grant them a role and the locations they can see.</div><div id="usersBody"><div class="empty">Loading…</div></div></div>`;
+    const c=$("#content"); c.innerHTML=`<div class="panel"><h2>Users &amp; access</h2>
+      <div class="desc">Create a login for a franchise owner, then set their role and the locations they can see. Super-admins see every location automatically.</div>
+      <div class="grid2" style="max-width:760px">
+        <div class="field"><label>New user email</label><input id="u_email" type="email" placeholder="owner@company.com"></div>
+        <div class="field"><label>Temporary password</label><input id="u_pw" placeholder="at least 8 characters"><span class="hint">Share it with them; they can change it later.</span></div>
+        <div class="field"><label>Role</label><select id="u_role"><option value="franchisee">Franchisee</option><option value="super_admin">Super Admin</option></select></div>
+        <div class="field"><label>Give access to location</label><select id="u_loc"><option value="">— choose a location —</option>${locations.map(l=>`<option value="${esc(l.id)}">${esc(l.name)}</option>`).join('')}</select><span class="hint">Franchisees need at least one location. Super-admins get all.</span></div>
+      </div>
+      <div class="row-actions"><button class="btn" data-action="createUser">Create user</button><span class="savemsg" id="uNewMsg"></span></div>
+      <hr style="border:0;border-top:1px solid var(--border);margin:22px 0">
+      <div id="usersBody"><div class="empty">Loading…</div></div></div>`;
     let profs=[],access=[]; try{ ({data:profs}=await SB.from('profiles').select('*').order('email')); }catch(_){}
     try{ ({data:access}=await SB.from('location_access').select('*')); }catch(_){}
     profs=profs||[]; access=access||[];
@@ -211,6 +228,16 @@
     if(chk.checked){ ({error}=await SB.from('location_access').insert({user_id:user,location_id:loc})); }
     else { ({error}=await SB.from('location_access').delete().eq('user_id',user).eq('location_id',loc)); }
     if(error){ msg.textContent=error.message; msg.style.color='var(--bad)'; chk.checked=!chk.checked; } else { msg.textContent='Saved ✓'; msg.style.color='var(--good)'; } }
+  async function createUser(){
+    const email=($("#u_email").value||'').trim(), pw=$("#u_pw").value||'', role=$("#u_role").value, loc=$("#u_loc").value||null;
+    const msg=$("#uNewMsg");
+    if(!email || pw.length<8){ msg.textContent='Enter an email and a password of at least 8 characters'; msg.style.color='var(--bad)'; return; }
+    if(role==='franchisee' && !loc){ msg.textContent='Pick a location for this franchisee'; msg.style.color='var(--bad)'; return; }
+    msg.textContent='Creating…'; msg.style.color='var(--ink-3)';
+    const {error}=await SB.rpc('admin_create_user',{p_email:email,p_password:pw,p_role:role,p_location_id:loc});
+    if(error){ msg.textContent=error.message; msg.style.color='var(--bad)'; }
+    else { msg.textContent='User created ✓'; msg.style.color='var(--good)'; $("#u_email").value=''; $("#u_pw").value=''; renderUsers(); }
+  }
 
   // ------------------------------------------------------ event delegation
   document.addEventListener('click', e=>{
@@ -224,6 +251,7 @@
     else if(a==='delTech') delTech(b.closest('tr'));
     else if(a==='saveLoc') saveLoc();
     else if(a==='saveCreds') saveCreds();
+    else if(a==='createUser') createUser();
   });
   document.addEventListener('change', e=>{
     const b=e.target.closest('[data-action]'); if(!b) return;

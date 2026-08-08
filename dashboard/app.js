@@ -30,8 +30,9 @@
     {id:'s8', name:"Kevin O'Brien", title:"Apprentice",        disc:"S", revenue:19400, sales:17200, conv:0.51, oja:441, opps:44, converted:22, hours:139, salesHr:124},
   ];
   const SAMPLE_GOALS = { revenue:{actual:312400,target:350000}, close:{actual:0.63,target:0.65},
-    reviews:{actual:47,target:60,rating:4.8,total:326}, memberships:{actual:28,target:35}, cancellations:11,
-    opportunities:509, oppJobAvg:551 };
+    reviews:{actual:47,target:60,rating:4.8,total:326},
+    homeguard:{actual:118,target:150}, powerPartner:{actual:27,target:40},
+    cancellations:11, opportunities:509, oppJobAvg:551 };
 
   // ===================== helpers ========================================
   const $ = (s,r=document)=>r.querySelector(s);
@@ -116,17 +117,20 @@
     const g = ov && ov.goals;
     const totRev=techs.reduce((a,t)=>a+t.revenue,0), totOpps=techs.reduce((a,t)=>a+t.opps,0), totConv=techs.reduce((a,t)=>a+t.converted,0);
     const closeActual = totOpps?totConv/totOpps:0;
+    // In LIVE mode, "sold"/review actuals come from ServiceTitan / GoHighLevel.
+    // Until those are wired, show N/A (null) rather than a fabricated number.
     location = { name, period:periodLabel(range),
       goals:{
-        revenue:{ actual: live?totRev:SAMPLE_GOALS.revenue.actual, target: g?Number(g.revenue_target):SAMPLE_GOALS.revenue.target },
+        revenue:{ actual: live?totRev:SAMPLE_GOALS.revenue.actual, target: g?Number(g.revenue_target):SAMPLE_GOALS.revenue.target, period: g?g.revenue_period:'monthly' },
         close:{ actual: live?closeActual:SAMPLE_GOALS.close.actual, target: g?Number(g.close_rate_target):SAMPLE_GOALS.close.target },
-        reviews:{ actual: g?g.reviews_actual:SAMPLE_GOALS.reviews.actual, target: g?g.reviews_target:SAMPLE_GOALS.reviews.target,
-                  rating: g?g.reviews_rating:SAMPLE_GOALS.reviews.rating, total: g?g.reviews_total:SAMPLE_GOALS.reviews.total } },
+        homeguard:{ actual: live?null:SAMPLE_GOALS.homeguard.actual, target: g?Number(g.homeguard_target):SAMPLE_GOALS.homeguard.target },
+        powerPartner:{ actual: live?null:SAMPLE_GOALS.powerPartner.actual, target: g?Number(g.power_partner_target):SAMPLE_GOALS.powerPartner.target },
+        membershipsPeriod: g?g.memberships_period:'annual',
+        reviews:{ actual: live?null:SAMPLE_GOALS.reviews.actual, target: g?Number(g.reviews_target):SAMPLE_GOALS.reviews.target,
+                  rating: live?null:SAMPLE_GOALS.reviews.rating, total: live?null:SAMPLE_GOALS.reviews.total, period: g?g.reviews_period:'monthly' } },
       context:{ opportunities: live?totOpps:SAMPLE_GOALS.opportunities,
                 oppJobAvg: (live&&totOpps)?totRev/totOpps:SAMPLE_GOALS.oppJobAvg,
-                memberships: g?g.memberships_actual:SAMPLE_GOALS.memberships.actual,
-                membershipsTarget: g?g.memberships_target:SAMPLE_GOALS.memberships.target,
-                cancellations: g?g.cancellations:SAMPLE_GOALS.cancellations } };
+                cancellations: live?null:SAMPLE_GOALS.cancellations } };
   }
   function loadData(){
     if(mode==='supabase' && currentLocationId){
@@ -205,34 +209,57 @@
 
   // ===================== render: company goals ==========================
   function statusOf(r){ if(r>=1) return {cls:"good",txt:"Goal met",ic:"✓"}; if(r>=0.85) return {cls:"warn",txt:"On pace",ic:"→"}; return {cls:"bad",txt:"Behind",ic:"!"}; }
+  const perLabel = p => p==='annual' ? 'annual' : 'monthly';
   function ringGoal(lbl,valHtml,tgtHtml,ratio,gold){ const s=statusOf(ratio),p=clampPct(ratio);
     return `<div class="goal"><div class="ring ${gold?"gold":""}" style="--p:${p}"><span class="ring-txt">${p}%</span></div>
       <div class="g-body"><div class="g-lbl">${lbl}</div><div class="g-val">${valHtml}</div><div class="g-tgt">Target ${tgtHtml}</div>
       <span class="status ${s.cls}">${s.ic} ${s.txt}</span></div></div>`; }
-  function reviewsGoal(r){ const ratio=r.target?r.actual/r.target:0,p=clampPct(ratio),s=statusOf(ratio);
+  // membership card: "sold" (actual) comes from ServiceTitan; null => awaiting sync
+  function membershipCard(lbl, actual, target, period){
+    if(actual==null){
+      return `<div class="goal"><div class="ring" style="--p:0"><span class="ring-txt">—</span></div>
+        <div class="g-body"><div class="g-lbl">${lbl}</div><div class="g-val">${target||0}<small> target</small></div>
+        <div class="g-tgt">${perLabel(period)} · sold count from ServiceTitan</div>
+        <span class="status warn">→ Awaiting ServiceTitan</span></div></div>`;
+    }
+    const ratio=target?actual/target:0, p=clampPct(ratio), s=statusOf(ratio);
+    return `<div class="goal"><div class="ring" style="--p:${p}"><span class="ring-txt">${p}%</span></div>
+      <div class="g-body"><div class="g-lbl">${lbl}</div><div class="g-val">${actual}<small> / ${target}</small></div>
+      <div class="g-tgt">${perLabel(period)} · sold vs target</div>
+      <span class="status ${s.cls}">${s.ic} ${s.txt}</span></div></div>`;
+  }
+  function reviewsGoal(r){
+    if(r.actual==null){
+      return `<div class="goal"><div class="ring gold" style="--p:0"><span class="ring-txt">—</span></div>
+        <div class="g-body"><div class="g-lbl">Google Reviews</div><div class="g-val">${r.target||0}<small> target</small></div>
+        <div class="stars"><span class="cnt">rating &amp; count pull from GoHighLevel</span></div>
+        <span class="status warn">→ Awaiting Google</span></div></div>`;
+    }
+    const ratio=r.target?r.actual/r.target:0,p=clampPct(ratio),s=statusOf(ratio);
     const stars = r.rating!=null ? `<span class="track"><span class="base">★★★★★</span><span class="fill" style="width:${(r.rating/5*100).toFixed(1)}%">★★★★★</span></span><span class="num">${Number(r.rating).toFixed(1)}</span>${r.total!=null?`<span class="cnt">· ${r.total} total</span>`:''}` : `<span class="cnt">rating not synced</span>`;
     return `<div class="goal"><div class="ring gold" style="--p:${p}"><span class="ring-txt">${r.actual}</span></div>
       <div class="g-body"><div class="g-lbl">Google Reviews · New This Period</div><div class="g-val">${r.actual}<small> / ${r.target}</small></div>
       <div class="stars">${stars}</div><span class="status ${s.cls}">${s.ic} ${s.txt}</span></div></div>`; }
   function renderGoals(){ const g=location.goals,c=location.context;
     const revFill=clampPct(g.revenue.actual/g.revenue.target); const scaleMax=Math.max(g.revenue.actual,g.revenue.target)*1.08||1;
-    const revTick=Math.min(100,g.revenue.target/scaleMax*100), revPos=Math.min(100,g.revenue.actual/scaleMax*100); const memT=c.membershipsTarget||35;
+    const revTick=Math.min(100,g.revenue.target/scaleMax*100), revPos=Math.min(100,g.revenue.actual/scaleMax*100);
     return `<div class="slide"><div class="slide-head"><div><p class="eyebrow">Company Goals</p><h2>${esc(location.name)}</h2>
       <div class="slide-sub">${location.period} · progress to targets</div></div><img class="goals-mascot" src="${MASCOT}" alt="PatchitUP"/></div>
-      <div class="goals-wrap"><div class="g-hero"><div><div class="h-lbl">Revenue to Goal</div><div class="h-val">${usd(g.revenue.actual)}</div>
-        <div class="h-tgt">of ${usd(g.revenue.target)} target · ${usd(Math.max(0,g.revenue.target-g.revenue.actual))} to go</div>
+      <div class="goals-wrap"><div class="g-hero"><div><div class="h-lbl">Revenue to Goal · ${perLabel(g.revenue.period)}</div><div class="h-val">${usd(g.revenue.actual)}</div>
+        <div class="h-tgt">of ${usd(g.revenue.target)} ${perLabel(g.revenue.period)} target · ${usd(Math.max(0,g.revenue.target-g.revenue.actual))} to go</div>
         <div class="h-meter"><i style="width:${revPos}%"></i><span style="left:${revTick}%"></span></div></div>
         <div class="h-attain"><div class="big">${revFill}%</div><div class="cap">of goal</div></div></div>
         <div class="goals-grid">
           ${ringGoal("Average Close Rate", pct(g.close.actual), pct(g.close.target), g.close.target?g.close.actual/g.close.target:0)}
+          ${membershipCard("HomeGuard Memberships", g.homeguard.actual, g.homeguard.target, g.membershipsPeriod)}
+          ${membershipCard("Power Partner Memberships", g.powerPartner.actual, g.powerPartner.target, g.membershipsPeriod)}
           ${reviewsGoal(g.reviews)}
-          ${ringGoal("Memberships Sold", c.memberships, memT, memT?c.memberships/memT:0, true)}
         </div>
         <div class="ctx-strip">
           <div class="ctx"><span class="k">Opportunities</span><span class="v">${c.opportunities}</span></div>
           <div class="ctx"><span class="k">Opp Job Avg</span><span class="v">${usd(c.oppJobAvg)}</span></div>
           <div class="ctx"><span class="k">Avg Close Rate</span><span class="v">${pct(g.close.actual)}</span></div>
-          <div class="ctx"><span class="k">Cancellations</span><span class="v">${c.cancellations}</span></div>
+          <div class="ctx"><span class="k">Cancellations</span><span class="v">${c.cancellations==null?'—':c.cancellations}</span></div>
         </div></div></div>`;
   }
 
