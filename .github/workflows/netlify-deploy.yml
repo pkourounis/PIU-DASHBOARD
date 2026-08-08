@@ -20,5 +20,5 @@ jobs:
       - name: Build and deploy to Netlify
         run: npx --yes netlify-cli@17 deploy --build --prod --site="$NETLIFY_SITE_ID" --auth="$NETLIFY_AUTH_TOKEN"
         env:
-          NETLIFY_SITE_ID: 6f67638d-0ed4-49a0-a1a0-3e5e3f8e861c
+          NETLIFY_SITE_ID: db7735aa-68ed-403d-9443-d8ca15fd1b1f
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
