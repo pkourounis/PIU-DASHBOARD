@@ -129,9 +129,12 @@
   .stage-wrap{position:relative; flex:1; display:flex; flex-direction:column; min-height:0}
   .stage{
     background:var(--panel); border:1px solid var(--border); border-radius:var(--radius);
-    box-shadow:var(--shadow-lg); overflow:hidden; flex:1; min-height:520px; display:flex; flex-direction:column; justify-content:center;
+    box-shadow:var(--shadow-lg); overflow:hidden; flex:1; min-height:520px; display:flex; flex-direction:column;
   }
-  .slide{padding:26px 30px 30px; animation:slidein .5s ease; position:relative}
+  /* #stage is the inner slot the slides inject into — it must fill the panel so slides can too. */
+  #stage{flex:1; display:flex; flex-direction:column; min-height:0}
+  /* Each slide fills the whole stage (no centered dead space) — it's a shop-TV board. */
+  .slide{padding:30px 34px 34px; animation:slidein .5s ease; position:relative; flex:1; display:flex; flex-direction:column; min-height:0}
   @keyframes slidein{from{opacity:0; transform:translateY(10px)} to{opacity:1; transform:none}}
   @media (prefers-reduced-motion: reduce){ .slide{animation:none} }
 
@@ -143,8 +146,9 @@
   .slide-sub{color:var(--ink-3); font-weight:600; font-size:13.5px}
 
   /* ── Technician scorecard ───────────────────────────────── */
-  .tech-grid{display:grid; grid-template-columns:380px 1fr; gap:22px}
-  @media (max-width:860px){ .tech-grid{grid-template-columns:1fr} }
+  .tech-grid{display:grid; grid-template-columns:400px 1fr; gap:24px; flex:1; min-height:0; grid-auto-rows:minmax(0,1fr)}
+  .tech-grid > div:last-child{display:flex; flex-direction:column; gap:16px; min-height:0}
+  @media (max-width:860px){ .tech-grid{grid-template-columns:1fr; flex:none} }
 
   .profile{
     background:linear-gradient(170deg,var(--panel-2),var(--panel)); border:1px solid var(--border);
@@ -152,8 +156,8 @@
     justify-content:space-between; gap:22px; position:relative;
   }
   .avatar{
-    width:236px; height:236px; border-radius:50%; display:grid; place-items:center;
-    font-size:76px; font-weight:800; color:#fff; letter-spacing:-.02em; position:relative;
+    width:clamp(236px, 17vw, 300px); aspect-ratio:1; border-radius:50%; display:grid; place-items:center;
+    font-size:84px; font-weight:800; color:#fff; letter-spacing:-.02em; position:relative;
     box-shadow:var(--shadow-lg); background:var(--gradient-brand);
   }
   .avatar::after{
@@ -196,14 +200,15 @@
   .rank-corner.podium{box-shadow:var(--shadow-lg), 0 0 0 3px rgba(255,255,255,.15) inset}
   @media (max-width:560px){ .rank-corner{top:14px; right:14px; padding:9px 14px; gap:10px} .rank-corner .medal{font-size:30px} .rank-corner .rk{font-size:24px} }
 
-  .metrics{display:grid; grid-template-columns:1fr 1fr; gap:16px}
+  .metrics{display:grid; grid-template-columns:1fr 1fr; gap:18px; flex:1; grid-auto-rows:1fr; min-height:0}
+  @media (max-width:860px){ .metrics{flex:none} }
   .mtile{
     background:var(--panel); border:1px solid var(--border); border-radius:var(--radius-sm);
-    padding:22px 24px; display:flex; flex-direction:column; gap:12px; box-shadow:var(--shadow); min-height:168px; justify-content:center;
+    padding:24px 26px; display:flex; flex-direction:column; gap:14px; box-shadow:var(--shadow); min-height:168px; justify-content:center;
   }
-  .mtile .lbl{font-size:12.5px; font-weight:800; letter-spacing:var(--ls-wide); text-transform:uppercase; color:var(--ink-3)}
-  .mtile .val{font-size:52px; font-weight:800; letter-spacing:-.03em; line-height:.95; font-variant-numeric:tabular-nums}
-  .mtile .val small{font-size:22px; font-weight:700; color:var(--ink-2); margin-left:2px}
+  .mtile .lbl{font-size:13.5px; font-weight:800; letter-spacing:var(--ls-wide); text-transform:uppercase; color:var(--ink-3)}
+  .mtile .val{font-size:clamp(52px, 4.4vw, 68px); font-weight:800; letter-spacing:-.03em; line-height:.95; font-variant-numeric:tabular-nums}
+  .mtile .val small{font-size:24px; font-weight:700; color:var(--ink-2); margin-left:2px}
   .delta{display:inline-flex; align-items:center; gap:5px; font-size:13px; font-weight:800}
   .delta.up{color:var(--good)} .delta.down{color:var(--bad)} .delta.flat{color:var(--ink-3)}
   .cmp{height:9px; border-radius:5px; background:var(--bar-soft); position:relative; overflow:hidden}
@@ -221,12 +226,13 @@
 
   /* ── Leaderboard (dense table) ──────────────────────────── */
   .lb-hint{font-size:12px; font-weight:700; color:var(--ink-3); letter-spacing:.01em}
-  .lb-scroll{overflow-x:auto; border:1px solid var(--border); border-radius:var(--radius-sm); box-shadow:var(--shadow)}
-  .lb-table{min-width:760px}
-  .lbcols{display:grid; grid-template-columns:58px minmax(190px,1.4fr) repeat(4,minmax(112px,1fr)); align-items:center}
-  .lb-head{background:var(--panel-2); border-bottom:1px solid var(--border)}
+  .lb-scroll{overflow:auto; border:1px solid var(--border); border-radius:var(--radius-sm); box-shadow:var(--shadow); flex:1; min-height:0; display:flex; flex-direction:column}
+  .lb-table{min-width:760px; flex:1; display:flex; flex-direction:column}
+  .lbcols{display:grid; grid-template-columns:64px minmax(200px,1.4fr) repeat(4,minmax(112px,1fr)); align-items:center}
+  .lb-head{background:var(--panel-2); border-bottom:1px solid var(--border); flex:none}
+  .lb-row2{flex:1}
   .lb-head .h{
-    padding:13px 16px; font-size:11px; font-weight:800; letter-spacing:var(--ls-wide); text-transform:uppercase;
+    padding:15px 16px; font-size:13px; font-weight:800; letter-spacing:var(--ls-wide); text-transform:uppercase;
     color:var(--ink-3); background:transparent; border:0; font-family:inherit; text-align:left; cursor:default; width:100%;
   }
   .lb-head button.h{cursor:pointer; display:flex; align-items:center; gap:5px}
@@ -238,25 +244,26 @@
   .lb-row2:last-child{border-bottom:0}
   .lb-row2:nth-child(even){background:color-mix(in srgb,var(--panel-2) 55%, transparent)}
   .lb-row2.top{background:color-mix(in srgb,var(--brand) 6%, transparent)}
-  .lb-rank{display:flex; align-items:center; justify-content:center; gap:2px; padding:12px 8px; font-size:19px; font-weight:800; color:var(--ink-3); font-variant-numeric:tabular-nums}
+  .lb-rank{display:flex; align-items:center; justify-content:center; gap:2px; padding:12px 8px; font-size:24px; font-weight:800; color:var(--ink-3); font-variant-numeric:tabular-nums}
   .lb-row2.top .lb-rank{color:var(--brand)}
-  .lb-rank .medal{font-size:22px}
-  .lb-id{display:flex; align-items:center; gap:12px; min-width:0; padding:11px 16px 11px 4px}
-  .lb-av{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;color:#fff;font-weight:800;font-size:15px;background:var(--gradient-brand);flex:none;position:relative}
+  .lb-rank .medal{font-size:30px}
+  .lb-id{display:flex; align-items:center; gap:15px; min-width:0; padding:14px 16px 14px 4px}
+  .lb-av{width:54px;height:54px;border-radius:50%;display:grid;place-items:center;color:#fff;font-weight:800;font-size:19px;background:var(--gradient-brand);flex:none;position:relative}
   .lb-av::after{content:"";position:absolute;inset:-3px;border-radius:50%;border:2px solid var(--disc-color,transparent)}
-  .lb-name{font-weight:800; font-size:15px; letter-spacing:-.01em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
-  .lb-title{font-size:11px; color:var(--ink-3); font-weight:700; letter-spacing:.02em}
-  .lbcell{display:flex; flex-direction:column; gap:6px; padding:11px 16px; min-width:0}
-  .lbcell .num{font-weight:800; font-size:15px; text-align:right; font-variant-numeric:tabular-nums; letter-spacing:-.02em; color:var(--ink-2)}
+  .lb-name{font-weight:800; font-size:20px; letter-spacing:-.01em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  .lb-title{font-size:12.5px; color:var(--ink-3); font-weight:700; letter-spacing:.02em}
+  .lbcell{display:flex; flex-direction:column; gap:6px; padding:14px 16px; min-width:0}
+  .lbcell .num{font-weight:800; font-size:19px; text-align:right; font-variant-numeric:tabular-nums; letter-spacing:-.02em; color:var(--ink-2)}
   .lbcell .b{height:6px; border-radius:4px; background:var(--bar-soft); overflow:hidden}
   .lbcell .b>i{display:block; height:100%; border-radius:4px; background:var(--bar-soft)}
   .lbcell.active{background:color-mix(in srgb,var(--brand) 7%, transparent)}
-  .lbcell.active .num{color:var(--brand-deep); font-size:16px}
+  .lbcell.active .num{color:var(--brand-deep); font-size:22px}
   .lbcell.active .b>i{background:var(--bar)}
   .lb-row2.top .lbcell.active .b>i{background:var(--bar-hi)}
 
   /* ── Company goals ──────────────────────────────────────── */
-  .goals-wrap{display:flex; flex-direction:column; gap:20px}
+  .goals-wrap{display:flex; flex-direction:column; gap:20px; flex:1; min-height:0}
+  @media (max-width:860px){ .goals-wrap{flex:none} }
   .goals-mascot{width:132px; height:132px; border-radius:50%; flex:none; filter:drop-shadow(var(--shadow))}
   @media (max-width:640px){ .goals-mascot{width:76px; height:76px} }
   /* hero revenue band */
@@ -275,11 +282,11 @@
   .h-attain .big{font-size:60px; font-weight:800; letter-spacing:-.03em; line-height:1}
   .h-attain .cap{font-size:10.5px; font-weight:800; letter-spacing:var(--ls-wide); text-transform:uppercase; color:rgba(255,255,255,.82)}
 
-  .goals-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:16px}
-  @media (max-width:860px){ .goals-grid{grid-template-columns:1fr} }
+  .goals-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:16px; flex:1; min-height:0; grid-auto-rows:minmax(0,1fr)}
+  @media (max-width:860px){ .goals-grid{grid-template-columns:1fr; flex:none} }
   .goal{
     background:linear-gradient(168deg,var(--blue-50),var(--panel) 78%); border:1px solid var(--border);
-    border-radius:var(--radius); padding:26px 24px; display:grid; grid-template-columns:auto 1fr; gap:24px; align-items:center; box-shadow:var(--shadow);
+    border-radius:var(--radius); padding:28px 26px; display:grid; grid-template-columns:auto 1fr; gap:26px; align-items:center; box-shadow:var(--shadow);
   }
   .goal .g-body{display:flex; flex-direction:column; gap:8px; min-width:0}
   .goal .g-lbl{font-size:13px; font-weight:800; letter-spacing:var(--ls-wide); text-transform:uppercase; color:var(--brand); }
