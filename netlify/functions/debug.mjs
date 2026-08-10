@@ -316,11 +316,37 @@ export default async (req, context) => {
       };
     } catch (e) { techRevenueDiag = { error: String(e.message || e) }; }
 
+    // MEMBERSHIPS: identify the plan types (HomeGuard vs Power Partner) and how they're sold, so
+    // we can split the memberships-sold count by plan for the goals cards. (No customer PII.)
+    let membershipsDiag = null;
+    try {
+      const mm = await client.get(tenant, `/memberships/v2/tenant/${tenant.tenantId}/memberships`,
+        { createdOnOrAfter: new Date(to.getTime() - 400 * 86400000).toISOString(), page: 1, pageSize: 200 });
+      const mrows = mm.data || [];
+      const typeCounts = {};
+      for (const m of mrows) {
+        const nm = m.membershipType?.name ?? m.type?.name ?? m.membershipTypeName ?? String(m.membershipTypeId ?? m.typeId ?? 'unknown');
+        typeCounts[nm] = (typeCounts[nm] || 0) + 1;
+      }
+      let membershipTypes = null;
+      try {
+        const tt = await client.get(tenant, `/memberships/v2/tenant/${tenant.tenantId}/membership-types`, { page: 1, pageSize: 100 });
+        membershipTypes = (tt.data || []).map((x) => ({ id: x.id, name: x.name, active: x.active }));
+      } catch (e) { membershipTypes = { error: String(e.message || e) }; }
+      membershipsDiag = {
+        count: mrows.length,
+        fieldKeys: mrows[0] ? Object.keys(mrows[0]) : [],
+        typeCounts,
+        membershipTypes,
+        sample: mrows.slice(0, 4).map((m) => ({ id: m.id, membershipType: m.membershipType, membershipTypeId: m.membershipTypeId ?? m.typeId ?? null, status: m.status, soldOn: m.soldOn, from: m.from, createdOn: m.createdOn, businessUnitId: m.businessUnitId })),
+      };
+    } catch (e) { membershipsDiag = { error: String(e.message || e) }; }
+
     return Response.json({
       tenant: t.name, windowDays: days, rowsSampled: rows.length,
       statusCounts, soldByStatus, withRealSoldOn, withRealSoldDate,
       realSoldOnButNotStatusSold, soldByCurrentLogic,
-      closeRate, stored, monthToDate, techRevenueDiag, techAttribution, jobsSample, assignments, appointments, sample,
+      closeRate, stored, monthToDate, techRevenueDiag, membershipsDiag, techAttribution, jobsSample, assignments, appointments, sample,
     });
   } catch (e) {
     return Response.json({ tenant: t.name, error: String(e.message || e) });
