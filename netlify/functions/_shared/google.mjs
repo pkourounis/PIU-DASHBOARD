@@ -72,6 +72,38 @@ export async function resolvePlaceIdFromUrl(shareUrl) {
   return { placeId: null, ftid: ftid ? ftid[0] : null, finalUrl, trail };
 }
 
+// Follow a Share/profile link to its final page and scrape the star rating + review count that
+// Google renders on the knowledge panel — the path for service-area profiles that exist as a
+// Knowledge-Graph entity (kgmid) with no Maps Place ID. Returns candidate values from several
+// patterns plus short excerpts, so we can lock onto whatever shape Google actually served.
+export async function probeReviewsFromUrl(shareUrl) {
+  let url = String(shareUrl || '').trim();
+  if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
+  let finalUrl = url, html = '';
+  const trail = [];
+  for (let i = 0; i < 6; i++) {
+    const res = await fetch(finalUrl, { redirect: 'manual', headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36', 'Accept-Language': 'en-US,en;q=0.9' } });
+    trail.push({ url: finalUrl, status: res.status });
+    if (res.status >= 300 && res.status < 400) { const loc = res.headers.get('location'); if (!loc) break; finalUrl = new URL(loc, finalUrl).href; continue; }
+    html = await res.text().catch(() => ''); break;
+  }
+  const first = (re) => { const m = html.match(re); return m ? m.slice(1).filter(Boolean) : null; };
+  const candidates = {
+    jsonld: first(/"aggregateRating"[^}]*?"ratingValue"\s*:\s*"?([\d.]+)"?[^}]*?"(?:reviewCount|ratingCount)"\s*:\s*"?([\d,]+)"?/i)
+         || first(/"(?:reviewCount|ratingCount)"\s*:\s*"?([\d,]+)"?[^}]*?"ratingValue"\s*:\s*"?([\d.]+)"?/i),
+    aria: first(/Rated\s+([\d.]+)\s+out of 5[^]{0,120}?([\d,]+)\s+review/i),
+    ratingOnly: first(/([\d.]+)\s*(?:★|stars?\b)/i),
+    reviewsOnly: first(/([\d,]+)\s+(?:Google\s+)?reviews?\b/i),
+    placeId: extractPlaceId(finalUrl) || extractPlaceId(html),
+    ftid: (finalUrl + ' ' + html).match(/0x[0-9a-f]+:0x[0-9a-f]+/i)?.[0] || null,
+  };
+  // A few short excerpts around the word "review" to eyeball the real markup.
+  const excerpts = [];
+  let idx = 0, n = 0;
+  while (n < 3) { idx = html.toLowerCase().indexOf('review', idx + 1); if (idx < 0) break; excerpts.push(html.slice(Math.max(0, idx - 90), idx + 40).replace(/\s+/g, ' ')); n++; }
+  return { finalUrl, htmlLen: html.length, candidates, excerpts, trail };
+}
+
 // Resolve { rating, count } for a location from any of: a stored Place ID, a Google profile /
 // Share URL (service-area friendly), or a free-text name query — in that order of preference.
 export async function fetchGoogleReviews(key, { placeId, url, query } = {}) {

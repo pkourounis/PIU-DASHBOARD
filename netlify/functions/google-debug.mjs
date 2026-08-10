@@ -2,7 +2,7 @@
 // total review count. Tries several query variants, and biases to the coordinates if provided.
 //   GET /api/google-debug/<tenant>?lat=40.7377599&lng=-73.7399525
 import { getConfig, debugForbidden } from './_shared/config.mjs';
-import { placesSearchText, placeDetails, resolvePlaceIdFromUrl, fetchGoogleReviews } from './_shared/google.mjs';
+import { placesSearchText, placeDetails, resolvePlaceIdFromUrl, fetchGoogleReviews, probeReviewsFromUrl } from './_shared/google.mjs';
 
 export default async (req, context) => {
   const forbidden = debugForbidden(req); if (forbidden) return forbidden;
@@ -20,6 +20,12 @@ export default async (req, context) => {
   // Place ID server-side, then read the live rating + count. This is the path for businesses with
   // no storefront address, which the map-pin Place ID Finder can't surface.
   const share = url.searchParams.get('share') || url.searchParams.get('url');
+  // ?probe=1 scrapes the rating + count straight off the knowledge-panel page the Share link lands
+  // on (for service-area profiles that have no Maps Place ID). Dumps candidate matches + excerpts.
+  if (share && url.searchParams.get('probe') === '1') {
+    try { return Response.json({ tenant: t.name, share, probe: await probeReviewsFromUrl(share) }); }
+    catch (e) { return Response.json({ tenant: t.name, share, error: String(e.message || e) }); }
+  }
   if (share) {
     try {
       const resolve = await resolvePlaceIdFromUrl(share);
