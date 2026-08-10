@@ -17,8 +17,16 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+      # Install deps so zip-it-and-ship-it can bundle @netlify/blobs + @netlify/functions
+      # into the functions. Without node_modules present, those imports resolve to nothing
+      # at runtime and every function that reads/writes Blobs crashes ("status code 0").
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      # --skip-functions-cache forces a fresh bundle every deploy. The cache does not reliably
+      # invalidate when a shared module (netlify/functions/_shared/*.mjs) changes, which would
+      # otherwise leave stale function code deployed after a provider/config edit.
       - name: Build and deploy to Netlify
-        run: npx --yes netlify-cli@17 deploy --build --prod --site="$NETLIFY_SITE_ID" --auth="$NETLIFY_AUTH_TOKEN"
+        run: npx --yes netlify-cli@17 deploy --build --prod --skip-functions-cache --site="$NETLIFY_SITE_ID" --auth="$NETLIFY_AUTH_TOKEN"
         env:
           NETLIFY_SITE_ID: db7735aa-68ed-403d-9443-d8ca15fd1b1f
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}

@@ -18,7 +18,17 @@ export default async () => {
   const hasData = tenants.some((t) => t.days > 0);
   // ok drives the dashboard's auto-switch to live: only flip once real data is stored.
   const appKeySet = c.tenants.length > 0 ? c.tenants.every((t) => t.appKey || c.appKey) : !!c.appKey;
-  return Response.json({ ok: isConfigured && hasData, configured: isConfigured, hasData, env: c.env, appKeySet, lastSyncAt: status?.at || null, tenants });
+  // Diagnostics (booleans only, no secret values) so an empty tenant list is debuggable
+  // remotely: which Supabase env vars the runtime sees, and which config path was used.
+  const diag = {
+    tenantCount: c.tenants.length,
+    configSource: c.source,
+    supabaseUrlSet: !!Netlify.env.get('SUPABASE_URL'),
+    supabaseAnonKeySet: !!Netlify.env.get('SUPABASE_ANON_KEY'),
+    syncSecretSet: !!Netlify.env.get('SYNC_TENANTS_SECRET'),
+    serviceRoleKeySet: !!Netlify.env.get('SUPABASE_SERVICE_ROLE_KEY'),
+  };
+  return Response.json({ ok: isConfigured && hasData, configured: isConfigured, hasData, env: c.env, appKeySet, lastSyncAt: status?.at || null, diag, tenants });
 };
 
 export const config = { path: '/api/health' };
