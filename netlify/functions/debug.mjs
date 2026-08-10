@@ -258,11 +258,68 @@ export default async (req, context) => {
       };
     } catch (e) { monthToDate = { error: String(e.message || e) }; }
 
+    // TECH-REVENUE SOURCE DIAGNOSTIC — find which ServiceTitan signal reproduces the dashboard's
+    // per-technician Completed Revenue (which ServiceTitan describes as "sum of income items on
+    // completed jobs, adjusted by technician split"). Dumps (a) invoice ITEMS grouped by the item's
+    // technician, and (b) the Payroll job-splits feed — so we can mirror ST exactly instead of
+    // reconstructing the split from appointment assignments.
+    let techRevenueDiag = null;
+    try {
+      const monthStart = new Date(Date.UTC(to.getUTCFullYear(), to.getUTCMonth(), 1));
+      const jj = await client.get(tenant, `/jpm/v2/tenant/${tenant.tenantId}/jobs`,
+        { completedOnOrAfter: monthStart.toISOString(), completedBefore: to.toISOString(), page: 1, pageSize: 500 });
+      const done = (jj.data || []).filter((j) => (j.jobStatus === 'Completed') && j.completedOn && new Date(j.completedOn) >= monthStart);
+      const jobIds = done.map((j) => j.id ?? j.jobId).filter((x) => x != null);
+
+      // Invoices for the window, WITH their line items (income items carry a technician).
+      const invData = [];
+      for (let p = 1; p <= 20; p++) {
+        const inv = await client.get(tenant, `/accounting/v2/tenant/${tenant.tenantId}/invoices`,
+          { createdOnOrAfter: new Date(monthStart.getTime() - 120 * 86400000).toISOString(), createdBefore: to.toISOString(), page: p, pageSize: 500 });
+        const rowsP = inv.data || []; invData.push(...rowsP);
+        if (!inv.hasMore || rowsP.length === 0) break;
+      }
+      const invByJob = new Map();
+      for (const inv of invData) { const jid = inv.job?.id ?? inv.jobId; if (jid != null) invByJob.set(String(jid), inv); }
+      const firstItem = (() => { for (const inv of invData) if (Array.isArray(inv.items) && inv.items[0]) return inv.items[0]; return null; })();
+
+      // (a) sum income-item amounts by the item's technician, on completed jobs only
+      const byItemTech = {};
+      let itemsSeen = 0, itemsWithTech = 0;
+      for (const j of done) {
+        const inv = invByJob.get(String(j.id ?? j.jobId)); if (!inv || !Array.isArray(inv.items)) continue;
+        for (const it of inv.items) {
+          itemsSeen++;
+          const tid = it.technicianId ?? it.technician?.id ?? it.soldById ?? null;
+          if (tid != null) itemsWithTech++;
+          const amt = num(it.total ?? it.price ?? 0);
+          if (amt) byItemTech[tid ?? 'none'] = Math.round((byItemTech[tid ?? 'none'] || 0) + amt);
+        }
+      }
+
+      // (b) Payroll job-splits feed (needs the Payroll API scope on the app)
+      let jobSplits = null, jobSplitsError = null;
+      try {
+        const sp = await client.get(tenant, `/payroll/v2/tenant/${tenant.tenantId}/jobs/splits`,
+          { jobIds: jobIds.slice(0, 50).join(','), page: 1, pageSize: 200 });
+        jobSplits = { count: (sp.data || []).length, sample: (sp.data || []).slice(0, 4), fields: (sp.data || [])[0] ? Object.keys(sp.data[0]) : [] };
+      } catch (e) { jobSplitsError = String(e.message || e); }
+
+      techRevenueDiag = {
+        completedJobs: done.length,
+        invoiceItemFieldKeys: firstItem ? Object.keys(firstItem) : [],
+        invoiceItemSample: firstItem,
+        itemsSeen, itemsWithTech,
+        revenueByInvoiceItemTechnician: byItemTech,
+        jobSplits, jobSplitsError,
+      };
+    } catch (e) { techRevenueDiag = { error: String(e.message || e) }; }
+
     return Response.json({
       tenant: t.name, windowDays: days, rowsSampled: rows.length,
       statusCounts, soldByStatus, withRealSoldOn, withRealSoldDate,
       realSoldOnButNotStatusSold, soldByCurrentLogic,
-      closeRate, stored, monthToDate, techAttribution, jobsSample, assignments, appointments, sample,
+      closeRate, stored, monthToDate, techRevenueDiag, techAttribution, jobsSample, assignments, appointments, sample,
     });
   } catch (e) {
     return Response.json({ tenant: t.name, error: String(e.message || e) });
