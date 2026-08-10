@@ -233,8 +233,24 @@ export function buildTechDaily({ estimates, appointments, assignments, jobs, inv
     rec.hours += ap.hours;
     if (ap.jobId != null) rec.jobSet.add(ap.jobId);
   }
-  // Completed (invoice) revenue attributed to the technician who RAN each completed opportunity
-  // job — the tech-level counterpart of the location's Completed Revenue, on the completion day.
+  // All technicians assigned to each job. A shared job credits EACH assigned tech the FULL
+  // completed revenue (no split) — the same "no split" rule labor hours use above, and how
+  // ServiceTitan's per-technician scorecards attribute it. Crediting only one tech (e.g. the
+  // earliest assignment) zeroes out every co-tech on a shared job.
+  const jobTechs = new Map();   // jobId -> Set(techId)
+  const asgName = {};
+  for (const asg of (assignments || [])) {
+    const tid = asg.technicianId; if (tid == null) continue;
+    if (asg.technicianName) asgName[tid] = asg.technicianName;
+    let jid = asg.jobId;
+    if (jid == null) { const ap = apptById.get(asg.appointmentId); jid = ap?.jobId; }
+    if (jid == null) continue;
+    if (!jobTechs.has(jid)) jobTechs.set(jid, new Set());
+    jobTechs.get(jid).add(tid);
+  }
+  // Completed (invoice) revenue attributed to the technician(s) who RAN each completed
+  // opportunity job — the tech-level counterpart of the location's Completed Revenue, on the
+  // completion day.
   const invAmtById = new Map();
   for (const inv of (invoices || [])) invAmtById.set(inv.id, num(inv.subTotal ?? inv.subtotal ?? inv.total ?? inv.amount));
   const jt = jobTech || new Map();
@@ -244,9 +260,12 @@ export function buildTechDaily({ estimates, appointments, assignments, jobs, inv
     const invSub = num(invAmtById.get(j.invoiceId ?? j.invoice?.id));
     if (j.noCharge && invSub <= SOLD_THRESHOLD) continue;   // same opportunity rule as the location
     const cod = day(j.completedOn); if (!cod) continue;
-    const ran = jt.get(jobId); const id = ran?.id ?? null;
-    ensureRoster(id, ran?.name);
-    getRec(getDay(cod), id).completedRev += invSub;
+    const set = jobTechs.get(jobId);
+    const ids = (set && set.size) ? [...set] : [jt.get(jobId)?.id ?? null];   // fall back to jobTech, else unassigned
+    for (const id of ids) {
+      ensureRoster(id, asgName[id] || jt.get(jobId)?.name);
+      getRec(getDay(cod), id).completedRev += invSub;
+    }
   }
   const out = {};
   for (const [d, m] of daily) { out[d] = {}; for (const [id, r] of m) out[d][id] = [r.oppJobs.size, r.convJobs.size, r.options, Math.round(r.revenue), Math.round(r.pipeline), +r.hours.toFixed(2), r.jobSet.size, Math.round(r.completedRev)]; }
