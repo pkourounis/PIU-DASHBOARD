@@ -95,7 +95,20 @@ export async function fetchWindow(client, tenant, from, to) {
   const assignments = pick(asgRes, 'assignments');
   const appointments = pick(apptRes, 'appointments');    // optional scope — absence just zeroes cancels
   const memberships = pick(memRes, 'memberships');        // optional scope — absence just zeroes memberships
-  return { estimates, jobs, invoices, assignments, appointments, memberships, errors: Object.keys(errors).length ? errors : null };
+
+  // Per-job technician split percentages drive split-adjusted Completed Revenue per tech. Fetched
+  // by job id (in batches) because a split is set once and doesn't carry the job's completion date.
+  // Optional scope — if payroll isn't granted, per-tech revenue falls back to an equal split.
+  let splits = [];
+  try {
+    const ids = [...new Set((jobs || []).map((j) => j.id ?? j.jobId).filter((x) => x != null))];
+    for (let i = 0; i < ids.length; i += 50) {
+      const part = await client.jobSplits(tenant, { jobIds: ids.slice(i, i + 50).join(',') });
+      if (Array.isArray(part)) splits.push(...part);
+    }
+  } catch (e) { errors.splits = String(e.message || e); }
+
+  return { estimates, jobs, invoices, assignments, appointments, memberships, splits, errors: Object.keys(errors).length ? errors : null };
 }
 
 /** Build the per-day metric map from raw entities, on ServiceTitan's bases (see file header).
@@ -199,7 +212,7 @@ export function buildTechnicians({ estimates }, infoById = {}, jobTech = null) {
  *  [opps, converted, options, revenue(sales), pipeline, hours, jobs, completedRevenue] — hours/jobs
  *  come from appointment durations; completedRevenue is the invoice subtotal on completed jobs the
  *  tech RAN (distinct from their sold value). Returns { roster, daily }. */
-export function buildTechDaily({ estimates, appointments, assignments, jobs, invoices }, infoById = {}, jobTech = null) {
+export function buildTechDaily({ estimates, appointments, assignments, jobs, invoices, splits }, infoById = {}, jobTech = null) {
   const roster = {};
   const daily = new Map(); // day -> Map(techId -> rec)
   const getDay = (d) => { if (!daily.has(d)) daily.set(d, new Map()); return daily.get(d); };
@@ -233,12 +246,18 @@ export function buildTechDaily({ estimates, appointments, assignments, jobs, inv
     rec.hours += ap.hours;
     if (ap.jobId != null) rec.jobSet.add(ap.jobId);
   }
-  // All technicians assigned to each job. ServiceTitan SPLITS a completed job's revenue across
-  // the techs who ran it ("adjusted by technician split"), so the per-tech revenues sum exactly
-  // to the location's Completed Revenue. We split equally by head count (ServiceTitan's default);
-  // custom per-job split percentages aren't exposed on the assignment feed. NOTE: this is the
-  // revenue rule only — labor hours above credit each assigned tech the FULL duration (no split).
-  const jobTechs = new Map();   // jobId -> Set(techId)
+  // ServiceTitan SPLITS a completed job's revenue across the techs who ran it ("split-adjusted"),
+  // by a percentage set per job (payroll job splits) — so the per-tech revenues sum exactly to the
+  // location's Completed Revenue. Prefer those real split %; fall back to an equal split across the
+  // assigned techs when a job has no split rows. NOTE: revenue rule only — labor hours above credit
+  // each assigned tech the FULL duration (no split).
+  const splitByJob = new Map();   // jobId -> [{ id: technicianId, pct: split }]
+  for (const s of (splits || [])) {
+    const jid = s.jobId, tid = s.technicianId; if (jid == null || tid == null) continue;
+    if (!splitByJob.has(jid)) splitByJob.set(jid, []);
+    splitByJob.get(jid).push({ id: tid, pct: num(s.split) });
+  }
+  const jobTechs = new Map();   // jobId -> Set(techId) — from appointment assignments (equal-split fallback)
   const asgName = {};
   for (const asg of (assignments || [])) {
     const tid = asg.technicianId; if (tid == null) continue;
@@ -261,12 +280,23 @@ export function buildTechDaily({ estimates, appointments, assignments, jobs, inv
     const invSub = num(invAmtById.get(j.invoiceId ?? j.invoice?.id));
     if (j.noCharge && invSub <= SOLD_THRESHOLD) continue;   // same opportunity rule as the location
     const cod = day(j.completedOn); if (!cod) continue;
-    const set = jobTechs.get(jobId);
-    const ids = (set && set.size) ? [...set] : [jt.get(jobId)?.id ?? null];   // fall back to jobTech, else unassigned
-    const share = invSub / ids.length;   // split the job's revenue equally across the techs who ran it
-    for (const id of ids) {
-      ensureRoster(id, asgName[id] || jt.get(jobId)?.name);
-      getRec(getDay(cod), id).completedRev += share;
+    const sp = splitByJob.get(jobId);
+    if (sp && sp.length) {
+      // ServiceTitan's real per-tech split percentages (normalized in case they don't sum to 100).
+      const totalPct = sp.reduce((a, x) => a + x.pct, 0) || 100;
+      for (const { id, pct } of sp) {
+        ensureRoster(id, asgName[id] || jt.get(jobId)?.name);
+        getRec(getDay(cod), id).completedRev += invSub * pct / totalPct;
+      }
+    } else {
+      // No split rows for this job → equal split across the assigned techs (or unassigned).
+      const set = jobTechs.get(jobId);
+      const ids = (set && set.size) ? [...set] : [jt.get(jobId)?.id ?? null];
+      const share = invSub / ids.length;
+      for (const id of ids) {
+        ensureRoster(id, asgName[id] || jt.get(jobId)?.name);
+        getRec(getDay(cod), id).completedRev += share;
+      }
     }
   }
   const out = {};

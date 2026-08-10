@@ -24,18 +24,28 @@ const jobs = [
 const invoices = [ { id: 500, subTotal: 1000 }, { id: 501, subTotal: 400 } ];
 
 const { jobTech } = buildJobTechMap(assignments);
-const { daily } = buildTechDaily({ estimates: [], appointments, assignments, jobs, invoices }, {}, jobTech);
 
+// (1) No split rows → fall back to an equal split across the assigned techs.
+const eq = {};
+for (const bt of Object.values(buildTechDaily({ estimates: [], appointments, assignments, jobs, invoices }, {}, jobTech).daily))
+  for (const [id, row] of Object.entries(bt)) eq[id] = (eq[id] || 0) + row[7];
+assert.equal(eq['A'], 500, `fallback: Alice gets half the shared job (got ${eq['A']})`);
+assert.equal(eq['B'], 900, `fallback: Bob gets half the shared job + his solo job (got ${eq['B']})`);   // 500 + 400
+
+// (2) With ServiceTitan job splits, revenue follows the real split percentages, not head count.
+const splits = [
+  { jobId: 100, technicianId: 'A', split: 75 },
+  { jobId: 100, technicianId: 'B', split: 25 },
+];
 const rev = {};
-for (const byTech of Object.values(daily)) for (const [id, row] of Object.entries(byTech)) rev[id] = (rev[id] || 0) + row[7];
-
-// Job 100 ($1000) split between A & B → $500 each. Job 200 ($400) solo to B.
-assert.equal(rev['A'], 500, `Alice gets her HALF of the shared job (got ${rev['A']})`);
-assert.equal(rev['B'], 900, `Bob gets his half of the shared job + his solo job (got ${rev['B']})`);   // 500 + 400
-// The invariant that makes the location total correct: per-tech revenue sums to the job total.
+for (const bt of Object.values(buildTechDaily({ estimates: [], appointments, assignments, jobs, invoices, splits }, {}, jobTech).daily))
+  for (const [id, row] of Object.entries(bt)) rev[id] = (rev[id] || 0) + row[7];
+assert.equal(rev['A'], 750, `split: Alice gets 75% of the shared job (got ${rev['A']})`);           // 1000 * .75
+assert.equal(rev['B'], 650, `split: Bob gets 25% of shared + his solo job (got ${rev['B']})`);      // 250 + 400
+// The invariant that keeps the location total exact: per-tech revenue sums to the completed-job total.
 const total = Object.values(rev).reduce((a, b) => a + b, 0);
 assert.equal(total, 1400, `per-tech revenue sums to the completed-job total 1000+400 (got ${total})`);
 assert.ok(!('null' in rev), 'no completed revenue leaked to Unassigned when techs are assigned');
 
-console.log('✓ tech-attribution OK — shared-job completed revenue is split across techs and sums to the total');
+console.log('✓ tech-attribution OK — completed revenue uses ServiceTitan job splits (equal-split fallback) and sums to the total');
 process.exit(0);
