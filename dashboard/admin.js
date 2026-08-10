@@ -154,8 +154,8 @@
       <td><input data-f="name" value="${esc(e.name||'')}" placeholder="Full name"${e.synced?' readonly title="Pulled from ServiceTitan"':''}></td>
       <td><input data-f="title" value="${esc(m.title||'')}" placeholder="e.g. Lead Technician"></td>
       <td><select data-f="disc">${discOpts(m.disc)}</select></td>
-      <td><input data-f="photo_url" value="${esc(m.photo_url||'')}" placeholder="${e.stPhoto?'Override (has ST photo)':'Photo URL (optional)'}"></td>
-      <td style="white-space:nowrap"><button class="btn" data-action="saveTech">Save</button>${m.id?` <button class="btn danger" data-action="delTech" title="Reset overrides">✕</button>`:''}</td></tr>`; };
+      <td><div style="display:flex;gap:6px;align-items:center"><input data-f="photo_url" value="${esc(m.photo_url||'')}" placeholder="${e.stPhoto?'Override (has ST photo)':'Paste URL or upload →'}" style="flex:1;min-width:120px"><button class="btn ghost" data-action="uploadPhoto" type="button" title="Upload a photo">Upload</button></div></td>
+      <td style="white-space:nowrap">${m.id?`<button class="btn danger" data-action="delTech" title="Reset overrides">✕</button>`:''}</td></tr>`; };
 
     const syncedCount=merged.filter(e=>e.synced).length;
     const note = loc.st_tenant_id
@@ -163,9 +163,9 @@
                      : `No technicians pulled yet — run <b>Sync ServiceTitan now</b> in Step 1, then reopen this tab.`)
       : `Connect ServiceTitan in Step 1 to pull technicians automatically.`;
     body.innerHTML=`<p class="hint" style="margin:0 0 14px">Step 3 — ${note} Names &amp; photos come from ServiceTitan; here you add what it doesn't store: <b>Title</b>, <b>DISC letter</b>, and a photo <i>only if</i> ServiceTitan has none. Tick <b>Show</b> for the ones to display on the leaderboard &amp; scorecards. Use the blank row at the bottom to add someone ServiceTitan doesn't have.</p>
-      <div class="tbl-scroll"><table class="tbl"><thead><tr><th>Show</th><th>Photo</th><th>Name</th><th>Title</th><th>DISC</th><th>Photo URL</th><th></th></tr></thead>
+      <div class="tbl-scroll"><table class="tbl"><thead><tr><th style="white-space:nowrap">Show <input type="checkbox" data-action="toggleAllTechs" title="Show / hide all" style="vertical-align:middle"></th><th>Photo</th><th>Name</th><th>Title</th><th>DISC</th><th>Photo URL</th><th></th></tr></thead>
       <tbody id="techBody">${merged.map(tr).join('')}${tr({st_tech_id:'',name:'',stPhoto:null,meta:{},synced:false})}</tbody></table></div>
-      <div class="savemsg" id="techMsg" style="margin-top:10px"></div>`;
+      <div class="row-actions" style="margin-top:12px"><button class="btn" data-action="saveAllTechs">Save all changes</button><span class="savemsg" id="techMsg"></span></div>`;
   }
   function techRowData(trEl){
     const g=f=>{ const el=trEl.querySelector(`[data-f="${f}"]`); return el?el.value.trim():''; };
@@ -181,6 +181,47 @@
     if(rec.id){ ({error}=await SB.from('technician_meta').update(rec).eq('id',rec.id)); }
     else { const {id,...ins}=rec; ({error}=await SB.from('technician_meta').insert(ins)); }
     if(error){ msg.textContent=error.message; msg.style.color='var(--bad)'; } else { msg.textContent='Saved ✓'; msg.style.color='var(--good)'; renderTechs(locations.find(l=>l.id===currentLocId)); }
+  }
+  // Save every technician row at once (Show, Title, DISC, photo). Blank add-row is skipped.
+  async function saveAllTechs(){
+    const msg=$("#techMsg"); msg.textContent='Saving…'; msg.style.color='var(--ink-3)';
+    const trs=[...document.querySelectorAll('#techBody tr')];
+    const ops=[];
+    for(const trEl of trs){
+      const rec=techRowData(trEl);
+      if(!rec.name && !rec.st_tech_id) continue;   // skip the empty add-row
+      if(rec.id){ const {id,...upd}=rec; ops.push(SB.from('technician_meta').update(upd).eq('id',rec.id)); }
+      else { const {id,...ins}=rec; ops.push(SB.from('technician_meta').insert(ins)); }
+    }
+    if(!ops.length){ msg.textContent='Nothing to save'; msg.style.color='var(--ink-3)'; return; }
+    try{
+      const results=await Promise.all(ops);
+      const bad=results.find(r=>r&&r.error);
+      if(bad&&bad.error){ msg.textContent=bad.error.message; msg.style.color='var(--bad)'; return; }
+      msg.textContent=`Saved ${ops.length} technician${ops.length===1?'':'s'} ✓`; msg.style.color='var(--good)';
+      renderTechs(locations.find(l=>l.id===currentLocId));
+    }catch(e){ msg.textContent=(e&&e.message)||'Save failed'; msg.style.color='var(--bad)'; }
+  }
+  // Upload a photo to Supabase Storage and drop its public URL into the row's Photo URL field.
+  function uploadPhoto(btn){
+    const trEl=btn.closest('tr'); if(!trEl) return; const msg=$("#techMsg");
+    const inp=document.createElement('input'); inp.type='file'; inp.accept='image/*';
+    inp.onchange=async()=>{
+      const file=inp.files&&inp.files[0]; if(!file) return;
+      if(file.size>5*1024*1024){ msg.textContent='Image too large — max 5 MB'; msg.style.color='var(--bad)'; return; }
+      msg.textContent='Uploading photo…'; msg.style.color='var(--ink-3)';
+      const ext=((file.name.split('.').pop()||'jpg').toLowerCase().replace(/[^a-z0-9]/g,''))||'jpg';
+      const who=(trEl.dataset.st||'manual').replace(/[^a-zA-Z0-9_-]/g,'')||'manual';
+      const path=`${currentLocId}/${who}-${Date.now()}.${ext}`;
+      const up=await SB.storage.from('tech-photos').upload(path,file,{upsert:true,contentType:file.type||'image/jpeg'});
+      if(up.error){ msg.textContent='Upload failed: '+up.error.message; msg.style.color='var(--bad)'; return; }
+      const url=(SB.storage.from('tech-photos').getPublicUrl(path).data||{}).publicUrl;
+      if(!url){ msg.textContent='Uploaded, but no public URL returned'; msg.style.color='var(--bad)'; return; }
+      const field=trEl.querySelector('[data-f="photo_url"]'); if(field) field.value=url;
+      const cell=trEl.children[1]; if(cell) cell.innerHTML=`<img src="${esc(url)}" alt="" style="width:34px;height:34px;border-radius:50%;object-fit:cover">`;
+      msg.textContent='Photo uploaded ✓ — click “Save all changes” to keep it.'; msg.style.color='var(--good)';
+    };
+    inp.click();
   }
   async function delTech(trEl){
     if(!trEl.dataset.id) return; const msg=$("#techMsg");
@@ -366,6 +407,8 @@
     else if(a==='addLocation') addLocation();
     else if(a==='saveGoals') saveGoals();
     else if(a==='saveTech') saveTech(b.closest('tr'));
+    else if(a==='saveAllTechs') saveAllTechs();
+    else if(a==='uploadPhoto') uploadPhoto(b);
     else if(a==='delTech') delTech(b.closest('tr'));
     else if(a==='saveLoc') saveLoc();
     else if(a==='saveCreds') saveCreds();
@@ -378,6 +421,7 @@
     const b=e.target.closest('[data-action]'); if(!b) return;
     if(b.dataset.action==='setRole') setRole(b);
     else if(b.dataset.action==='toggleAccess') toggleAccess(b);
+    else if(b.dataset.action==='toggleAllTechs'){ const on=b.checked; document.querySelectorAll('#techBody [data-f="display"]').forEach(c=>{ c.checked=on; }); }
   });
 
   // ------------------------------------------------------ boot
