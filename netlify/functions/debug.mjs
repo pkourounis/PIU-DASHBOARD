@@ -1,7 +1,7 @@
 // Diagnostic: summarizes the RAW ServiceTitan estimate shape for one tenant so we can see
 // exactly which "sold" signal is trustworthy and what the close rate SHOULD be.
 //   GET /api/debug/<tenantId>        (no customer PII — sales-status fields only)
-import { getConfig, configured } from './_shared/config.mjs';
+import { getConfig, configured, debugForbidden } from './_shared/config.mjs';
 import { readSnapshot } from './_shared/blobStore.mjs';
 import { ServiceTitanClient } from '../../dashboard/server/src/servicetitan.js';
 
@@ -12,6 +12,7 @@ const validDate = (d) => { if (!d) return false; const t = Date.parse(d); return
 const jobIdOf = (e) => e.jobId ?? e.job?.id ?? e.id;
 
 export default async (req, context) => {
+  const forbidden = debugForbidden(req); if (forbidden) return forbidden;
   const c = await getConfig();
   if (!configured(c)) return Response.json({ error: 'not configured' });
   // Match by tenantId, or by a friendly code/name (case-insensitive substring) so you can hit

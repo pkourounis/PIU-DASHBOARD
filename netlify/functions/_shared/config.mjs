@@ -104,4 +104,15 @@ export async function getConfig() {
 // Configured once there's at least one tenant that has an effective app key — its own
 // (entered in the admin) or the shared ST_APP_KEY fallback.
 export const configured = (c) => c.tenants.length > 0 && c.tenants.some((t) => t.appKey || c.appKey);
+
+// Gate the diagnostic endpoints (which dump raw revenue/splits/credentials-adjacent data) behind
+// a token, so they aren't world-readable. Accepts ?token= matching DEBUG_TOKEN, else the existing
+// SYNC_TENANTS_SECRET. Returns a 403 Response when unauthorized, or null when allowed.
+export function debugForbidden(req) {
+  const want = Netlify.env.get('DEBUG_TOKEN') || Netlify.env.get('SYNC_TENANTS_SECRET') || '';
+  let got = '';
+  try { got = new URL(req.url).searchParams.get('token') || ''; } catch { /* no url */ }
+  if (want && got === want) return null;
+  return new Response(JSON.stringify({ error: 'forbidden', hint: 'append ?token=<secret>' }), { status: 403, headers: { 'content-type': 'application/json' } });
+}
 export const publicTenant = (t) => ({ name: t.name, code: t.code || null, region: t.region || null, market: t.market || null, state: t.state || null, tenant: String(t.tenantId) });

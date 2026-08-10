@@ -1,10 +1,11 @@
 // Diagnostic: probes the GoHighLevel reviews API for one location so we can see the exact
 // response shape (where the rating, count and platform live) before wiring the goals card.
 //   GET /api/ghl-debug/<tenant>     (PII-light: dumps structure + rating fields, not review text)
-import { getConfig } from './_shared/config.mjs';
+import { getConfig, debugForbidden } from './_shared/config.mjs';
 import { ghlGet } from './_shared/gohighlevel.mjs';
 
 export default async (req, context) => {
+  const forbidden = debugForbidden(req); if (forbidden) return forbidden;
   const c = await getConfig();
   const key = decodeURIComponent(context.params.tenant || '').toLowerCase();
   const t = c.tenants.find((x) => String(x.tenantId) === context.params.tenant)

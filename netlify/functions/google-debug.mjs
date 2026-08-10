@@ -1,10 +1,11 @@
 // Diagnostic: finds the right Google business for a location and returns its live star rating +
 // total review count. Tries several query variants, and biases to the coordinates if provided.
 //   GET /api/google-debug/<tenant>?lat=40.7377599&lng=-73.7399525
-import { getConfig } from './_shared/config.mjs';
+import { getConfig, debugForbidden } from './_shared/config.mjs';
 import { placesSearchText, placeDetails } from './_shared/google.mjs';
 
 export default async (req, context) => {
+  const forbidden = debugForbidden(req); if (forbidden) return forbidden;
   const key = Netlify.env.get('GOOGLE_MAPS_API_KEY');
   if (!key) return Response.json({ error: 'GOOGLE_MAPS_API_KEY not set' });
   const c = await getConfig();
