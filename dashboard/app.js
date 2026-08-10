@@ -91,10 +91,16 @@
         })); }catch(_){}
     },
   };
-  // Sum location-level daily metrics (memberships, etc.) over the selected date range.
-  function sumDaily(stTenant, keys){
+  // Sum location-level daily metrics over a goal period window. Memberships are an annual goal, so
+  // 'annual' sums the trailing 12 months (captures the active selling year regardless of the
+  // toolbar's date range); 'monthly' sums the current month.
+  function sumDailyWindow(stTenant, keys, period){
     const arr=Adapter.daily.get(String(stTenant)); if(!arr) return null;
-    const [from,to]=rangeBounds(range); const acc={}; keys.forEach(k=>acc[k]=0);
+    const now=new Date();
+    const from = period==='monthly'
+      ? iso(new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)))
+      : iso(new Date(now.getTime()-365*86400000));
+    const to=iso(now); const acc={}; keys.forEach(k=>acc[k]=0);
     for(const row of arr){ const t=row.t; if(!t||t<from||t>to) continue; keys.forEach(k=>acc[k]+=row[k]||0); }
     return acc;
   }
@@ -150,7 +156,8 @@
       const base = liveRows || SAMPLE_TECHS.map(t=>({...t}));
       techs = applyOverlayMeta(base, ov);
       computeTeamAvg();
-      const md = (Adapter.live && loc.stTenant) ? sumDaily(loc.stTenant,['homeguard','powerPartner','memberships']) : null;
+      const memPeriod = (ov.goals && ov.goals.memberships_period) || 'annual';
+      const md = (Adapter.live && loc.stTenant) ? sumDailyWindow(loc.stTenant,['homeguard','powerPartner','memberships'],memPeriod) : null;
       buildLocation(loc.name, ov, !!liveRows, md);
     } else {
       techs = SAMPLE_TECHS.map(t=>({...t}));

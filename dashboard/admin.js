@@ -285,7 +285,8 @@
       <hr style="border:0;border-top:1px solid var(--border);margin:22px 0">
       <h2 style="font-size:16px;margin:0 0 4px">ServiceTitan data</h2>
       <p class="hint">Once the tenant id + credentials above are saved, pull the data. The first sync backfills history and can take a minute or two; after that it refreshes automatically every hour.</p>
-      <div class="row-actions"><button class="btn" data-action="syncNow">Sync ServiceTitan now</button><span class="savemsg" id="syncMsg"></span></div>
+      <div class="row-actions"><button class="btn" data-action="syncNow">Sync ServiceTitan now</button><button class="btn ghost" data-action="syncFull">Rebuild full history</button><span class="savemsg" id="syncMsg"></span></div>
+      <p class="hint" style="margin-top:6px"><b>Rebuild full history</b> re-pulls the entire backfill window and overwrites stored days. Use it once after a mapping fix (e.g. membership plan split) so older days pick up the new fields.</p>
       <div class="hint" id="syncHealth" style="margin-top:8px"></div>`;
     refreshSyncHealth();
   }
@@ -314,12 +315,13 @@
     if(error){ msg.textContent=error.message; msg.style.color='var(--bad)'; } else { $("#c_cid").value=''; $("#c_secret").value=''; $("#c_appkey").value=''; $("#c_ghlkey").value=''; renderLocation(); }
   }
   // Kick off the backend sync (Netlify background function) and watch the stored data land.
-  async function syncNow(){
-    const msg=$("#syncMsg"); msg.textContent='Starting sync…'; msg.style.color='var(--ink-3)';
+  async function syncNow(full){
+    if(full && !confirm('Rebuild the full history? This re-pulls the entire backfill window and overwrites the stored days. It can take a few minutes.')) return;
+    const msg=$("#syncMsg"); msg.textContent=full?'Starting full rebuild…':'Starting sync…'; msg.style.color='var(--ink-3)';
     try{
-      const r=await fetch('/api/sync',{method:'POST',cache:'no-store'});
+      const r=await fetch('/api/sync'+(full?'?full=1':''),{method:'POST',cache:'no-store'});
       if(r.status>=400) throw new Error('HTTP '+r.status);
-      msg.textContent='Sync started — pulling from ServiceTitan. This can take a minute or two.'; msg.style.color='var(--good)';
+      msg.textContent=(full?'Full rebuild started':'Sync started')+' — pulling from ServiceTitan. This can take a minute or two.'; msg.style.color='var(--good)';
       pollSyncHealth(0);
     }catch(e){ msg.textContent='Could not start the sync ('+(e.message||e)+'). Is the backend deployed?'; msg.style.color='var(--bad)'; }
   }
@@ -436,7 +438,8 @@
     else if(a==='delTech') delTech(b.closest('tr'));
     else if(a==='saveLoc') saveLoc();
     else if(a==='saveCreds') saveCreds();
-    else if(a==='syncNow') syncNow();
+    else if(a==='syncNow') syncNow(false);
+    else if(a==='syncFull') syncNow(true);
     else if(a==='deleteLocation') deleteLocation();
     else if(a==='createUser') createUser();
     else if(a==='copyInstr'){ const ta=$("#uInstrTxt"); if(ta){ ta.select(); try{ document.execCommand('copy'); }catch(_){} navigator.clipboard&&navigator.clipboard.writeText(ta.value).catch(()=>{}); b.textContent='Copied ✓'; setTimeout(()=>b.textContent='Copy to clipboard',1500); } }
