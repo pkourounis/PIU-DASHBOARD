@@ -67,7 +67,7 @@
 
   // ===================== state ==========================================
   let techs=[], teamAvg={}, location={}, range='month';
-  let mode='demo';                 // 'demo' | 'supabase'
+  let mode='demo';                 // 'demo' | 'supabase' | 'share' (view-only per-location link)
   let session=null, profile=null;
   let supaLocations=[], currentLocationId=null;
   const overlays={};               // locationId -> { goals, techMeta[] }
@@ -149,7 +149,7 @@
                 cancellations: live?null:SAMPLE_GOALS.cancellations } };
   }
   function loadData(){
-    if(mode==='supabase' && currentLocationId){
+    if((mode==='supabase'||mode==='share') && currentLocationId){
       const loc=supaLocations.find(l=>l.id===currentLocationId)||{name:'Location',stTenant:null};
       const ov=overlays[currentLocationId]||{goals:null,techMeta:[]};
       const liveRows = (Adapter.live && loc.stTenant) ? computeTechsLive(loc.stTenant) : null;
@@ -370,10 +370,47 @@
     });
   }
 
+  // ===================== per-location share link ========================
+  // A view-only URL like /PIU/<token> (or ?share=<token>) opens one location's
+  // dashboard with no login and no admin. The token maps to a location via the
+  // public_dashboard() SECURITY DEFINER RPC, which returns only public-safe
+  // fields (name, goals, technician meta) for that single location. KPI numbers
+  // still come from the already-public /api/* endpoints.
+  function shareTokenFromUrl(){
+    try{
+      const m=window.location.pathname.match(/\/PIU\/([A-Za-z0-9_-]{6,})\/?$/);
+      if(m) return m[1];
+      const q=new URLSearchParams(window.location.search).get('share');
+      if(q&&/^[A-Za-z0-9_-]{6,}$/.test(q)) return q;
+    }catch(_){}
+    return null;
+  }
+  async function loadShare(token){
+    if(!SB) return false;
+    try{
+      const {data,error}=await SB.rpc('public_dashboard',{p_token:token});
+      if(error||!data||!data.location) return false;
+      const loc=data.location;
+      supaLocations=[{ id:loc.id, name:loc.name, stTenant:loc.st_tenant_id||null }];
+      currentLocationId=loc.id;
+      overlays[loc.id]={ goals:data.goals||null,
+        techMeta:(data.techs||[]).map(t=>({ st_tech_id:t.st_tech_id, name:t.name, title:t.title, disc:t.disc, photo_url:t.photo_url, display:true })) };
+      mode='share';
+      return true;
+    }catch(_){ return false; }
+  }
+
   // ===================== boot ===========================================
   async function boot(){
     setMode("kiosk"); wireLogin();
     await Adapter.init();
+    const shareToken=shareTokenFromUrl();
+    if(shareToken){
+      const ok=await loadShare(shareToken);
+      if(ok){ showLogin(false); loadData(); return; }   // valid link → view-only, skip login entirely
+      // invalid/expired token → fall through to the normal (login/sample) flow below.
+      if(SB){ showLogin(true); loginMsg('That dashboard link is no longer valid.', true); loadData(); return; }
+    }
     if(SB){
       SB.auth.onAuthStateChange(async (_e,s)=>{ session=s;
         if(s){ mode='supabase'; await loadSupabaseContext(); showLogin(false); loadData(); }

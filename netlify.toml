@@ -10,6 +10,15 @@
   node_bundler = "esbuild"
   directory = "netlify/functions"
 
+# Per-location shareable view-only URLs: /PIU/<share-token> serves the same SPA
+# (index.html). app.js reads the token from the path and loads only that location,
+# view-only (no login, no admin). <base href="/"> keeps relative assets resolving
+# to the site root. Keep this above the SPA/API routing so it wins.
+[[redirects]]
+  from = "/PIU/*"
+  to = "/index.html"
+  status = 200
+
 # Always revalidate the app shell + scripts so a new deploy is picked up on the next normal
 # reload — no hard-refresh needed. Without this, browsers cache admin.js/app.js across deploys
 # and can run stale code (e.g. an old photo uploader that skips image normalization).

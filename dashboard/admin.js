@@ -287,7 +287,16 @@
       <p class="hint">Once the tenant id + credentials above are saved, pull the data. The first sync backfills history and can take a minute or two; after that it refreshes automatically every hour.</p>
       <div class="row-actions"><button class="btn" data-action="syncNow">Sync ServiceTitan now</button><button class="btn ghost" data-action="syncFull">Rebuild full history</button><span class="savemsg" id="syncMsg"></span></div>
       <p class="hint" style="margin-top:6px"><b>Rebuild full history</b> re-pulls the entire backfill window and overwrites stored days. Use it once after a mapping fix (e.g. membership plan split) so older days pick up the new fields.</p>
-      <div class="hint" id="syncHealth" style="margin-top:8px"></div>`;
+      <div class="hint" id="syncHealth" style="margin-top:8px"></div>
+      <hr style="border:0;border-top:1px solid var(--border);margin:22px 0">
+      <h2 style="font-size:16px;margin:0 0 4px">Shareable dashboard link</h2>
+      <p class="hint">A view-only link to <b>this location's</b> dashboard — no login, no admin. Send it to the owner or put it on a lobby screen. Rotating it instantly invalidates the old link.</p>
+      <div class="row-actions" style="align-items:center">
+        <input id="shareUrl" readonly value="${esc(shareUrl(loc))}" style="flex:1;min-width:280px;font-family:ui-monospace,monospace;font-size:12.5px" onclick="this.select()">
+        <button class="btn" data-action="copyShare">Copy link</button>
+        <button class="btn ghost" data-action="rotateShare">Rotate</button>
+        <span class="savemsg" id="shareMsg"></span>
+      </div>`;
     refreshSyncHealth();
   }
   async function saveLoc(){
@@ -313,6 +322,24 @@
     msg.textContent='Saving…'; msg.style.color='var(--ink-3)';
     const {error}=await SB.rpc('save_location_credentials',{p_location_id:currentLocId,p_client_id:cid,p_client_secret:secret,p_app_key:appkey,p_ghl_api_key:ghlkey});
     if(error){ msg.textContent=error.message; msg.style.color='var(--bad)'; } else { $("#c_cid").value=''; $("#c_secret").value=''; $("#c_appkey").value=''; $("#c_ghlkey").value=''; renderLocation(); }
+  }
+  // Build the public view-only URL for a location from its opaque share token.
+  function shareUrl(loc){ const t=loc&&loc.share_token; if(!t) return '(save the location first)';
+    return location.origin+'/PIU/'+t; }
+  async function copyShare(){
+    const inp=$("#shareUrl"), msg=$("#shareMsg"); if(!inp) return;
+    inp.select(); try{ document.execCommand('copy'); }catch(_){}
+    if(navigator.clipboard) navigator.clipboard.writeText(inp.value).catch(()=>{});
+    if(msg){ msg.textContent='Copied ✓'; msg.style.color='var(--good)'; setTimeout(()=>{ if(msg) msg.textContent=''; },1500); }
+  }
+  async function rotateShare(){
+    const loc=locations.find(l=>l.id===currentLocId); if(!loc) return;
+    if(!confirm('Rotate this location’s link? The current link will stop working immediately and anyone using it will need the new one.')) return;
+    const msg=$("#shareMsg"); if(msg){ msg.textContent='Rotating…'; msg.style.color='var(--ink-3)'; }
+    const {data,error}=await SB.rpc('rotate_share_token',{p_location_id:currentLocId});
+    if(error){ if(msg){ msg.textContent=error.message; msg.style.color='var(--bad)'; } return; }
+    loc.share_token=data; const inp=$("#shareUrl"); if(inp) inp.value=shareUrl(loc);
+    if(msg){ msg.textContent='New link ready ✓'; msg.style.color='var(--good)'; setTimeout(()=>{ if(msg) msg.textContent=''; },1800); }
   }
   // Kick off the backend sync (Netlify background function) and watch the stored data land.
   async function syncNow(full){
@@ -440,6 +467,8 @@
     else if(a==='saveCreds') saveCreds();
     else if(a==='syncNow') syncNow(false);
     else if(a==='syncFull') syncNow(true);
+    else if(a==='copyShare') copyShare();
+    else if(a==='rotateShare') rotateShare();
     else if(a==='deleteLocation') deleteLocation();
     else if(a==='createUser') createUser();
     else if(a==='copyInstr'){ const ta=$("#uInstrTxt"); if(ta){ ta.select(); try{ document.execCommand('copy'); }catch(_){} navigator.clipboard&&navigator.clipboard.writeText(ta.value).catch(()=>{}); b.textContent='Copied ✓'; setTimeout(()=>b.textContent='Copy to clipboard',1500); } }
