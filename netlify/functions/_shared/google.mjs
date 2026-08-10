@@ -4,7 +4,9 @@ const PLACES = 'https://places.googleapis.com/v1';
 
 // Find a place by free-text (business name + city/region). Returns the top match with rating/count.
 export async function placesSearchText(key, textQuery, { locationBias } = {}) {
-  const body = { textQuery, maxResultCount: 5 };
+  // includePureServiceAreaBusinesses: return businesses with no storefront address (service-area
+  // businesses) — otherwise Places omits them from search entirely.
+  const body = { textQuery, maxResultCount: 5, includePureServiceAreaBusinesses: true };
   if (locationBias) body.locationBias = locationBias;
   const res = await fetch(`${PLACES}/places:searchText`, {
     method: 'POST',
