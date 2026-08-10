@@ -123,24 +123,54 @@
   async function renderTechs(loc){
     const body=$("#tabBody"); body.innerHTML=`<div class="empty">Loading…</div>`;
     let rows=[]; try{ const {data}=await SB.from('technician_meta').select('*').eq('location_id',loc.id).order('name'); rows=data||[]; }catch(_){}
+    // Pull the technicians the sync discovered in ServiceTitan (roster: st_tech_id → {name, photo}).
+    let roster={};
+    if(loc.st_tenant_id){
+      try{ const r=await fetch(`/api/locations/${encodeURIComponent(loc.st_tenant_id)}/tech-daily`,{cache:'no-store'});
+           if(r.ok){ const j=await r.json(); roster=(j&&j.roster)||{}; } }catch(_){}
+    }
+    // Index saved meta by ST id and by lowercased name so overrides line up with the synced tech.
+    const metaById={}, metaByName={};
+    rows.forEach(m=>{ if(m.st_tech_id) metaById[String(m.st_tech_id)]=m; if(m.name) metaByName[m.name.trim().toLowerCase()]=m; });
+    const usedMetaIds=new Set();
+    const merged=[];
+    Object.keys(roster).sort((a,b)=>String(roster[a].name||'').localeCompare(String(roster[b].name||''))).forEach(id=>{
+      const info=roster[id]||{};
+      const m=metaById[String(id)] || (info.name?metaByName[info.name.trim().toLowerCase()]:null) || {};
+      if(m.id) usedMetaIds.add(m.id);
+      merged.push({ st_tech_id:String(id), name:(m.name||info.name||''), stPhoto:info.photo||null, meta:m, synced:true });
+    });
+    // Any manually-added meta rows not represented in the roster (e.g. techs no longer active).
+    rows.forEach(m=>{ if(!usedMetaIds.has(m.id)) merged.push({ st_tech_id:m.st_tech_id||'', name:m.name||'', stPhoto:null, meta:m, synced:false }); });
+
     const discOpts=v=>['','D','I','S','C'].map(o=>`<option value="${o}" ${o===(v||'')?'selected':''}>${o||'—'}</option>`).join('');
-    const tr=r=>`<tr data-id="${r.id||''}">
-      <td style="text-align:center"><input type="checkbox" class="chk" data-f="display" ${r.display!==false?'checked':''} title="Show on leaderboard"></td>
-      <td><input data-f="name" value="${esc(r.name||'')}" placeholder="Full name"></td>
-      <td><input data-f="st_tech_id" value="${esc(r.st_tech_id||'')}" placeholder="ST id (optional)"></td>
-      <td><input data-f="title" value="${esc(r.title||'')}" placeholder="Title"></td>
-      <td><select data-f="disc">${discOpts(r.disc)}</select></td>
-      <td><input data-f="photo_url" value="${esc(r.photo_url||'')}" placeholder="Photo URL (optional)"></td>
-      <td style="white-space:nowrap"><button class="btn" data-action="saveTech">Save</button>${r.id?` <button class="btn danger" data-action="delTech">✕</button>`:''}</td></tr>`;
-    body.innerHTML=`<p class="hint" style="margin:0 0 14px">Step 3 — once ServiceTitan is connected, your technicians are pulled in automatically with their photos and metrics. Tick <b>Show</b> for the ones to display on the leaderboard &amp; scorecards. Here you also add what ServiceTitan doesn't store: <b>Title</b>, <b>DISC letter</b>, and a photo <i>only if</i> ServiceTitan has none. Match by ST id when set, otherwise by exact name.</p>
-      <div class="tbl-scroll"><table class="tbl"><thead><tr><th>Show</th><th>Name</th><th>ST id</th><th>Title</th><th>DISC</th><th>Photo URL</th><th></th></tr></thead>
-      <tbody id="techBody">${rows.map(tr).join('')}${tr({})}</tbody></table></div>
+    const avatar=(e)=>{ const p=(e.meta&&e.meta.photo_url)||e.stPhoto;
+      return p ? `<img src="${esc(p)}" alt="" style="width:34px;height:34px;border-radius:50%;object-fit:cover;background:var(--panel-2)">`
+               : `<span style="display:inline-flex;width:34px;height:34px;border-radius:50%;background:var(--blue-50);color:var(--brand-deep);align-items:center;justify-content:center;font-weight:700;font-size:13px">${esc((e.name||'?').trim().charAt(0).toUpperCase()||'?')}</span>`; };
+    const tr=e=>{ const m=e.meta||{};
+      return `<tr data-id="${m.id||''}" data-st="${esc(e.st_tech_id||'')}">
+      <td style="text-align:center"><input type="checkbox" class="chk" data-f="display" ${m.display!==false?'checked':''} title="Show on leaderboard"></td>
+      <td style="text-align:center">${avatar(e)}</td>
+      <td><input data-f="name" value="${esc(e.name||'')}" placeholder="Full name"${e.synced?' readonly title="Pulled from ServiceTitan"':''}></td>
+      <td><input data-f="title" value="${esc(m.title||'')}" placeholder="e.g. Lead Technician"></td>
+      <td><select data-f="disc">${discOpts(m.disc)}</select></td>
+      <td><input data-f="photo_url" value="${esc(m.photo_url||'')}" placeholder="${e.stPhoto?'Override (has ST photo)':'Photo URL (optional)'}"></td>
+      <td style="white-space:nowrap"><button class="btn" data-action="saveTech">Save</button>${m.id?` <button class="btn danger" data-action="delTech" title="Reset overrides">✕</button>`:''}</td></tr>`; };
+
+    const syncedCount=merged.filter(e=>e.synced).length;
+    const note = loc.st_tenant_id
+      ? (syncedCount ? `<b>${syncedCount}</b> technician${syncedCount===1?'':'s'} pulled from ServiceTitan.`
+                     : `No technicians pulled yet — run <b>Sync ServiceTitan now</b> in Step 1, then reopen this tab.`)
+      : `Connect ServiceTitan in Step 1 to pull technicians automatically.`;
+    body.innerHTML=`<p class="hint" style="margin:0 0 14px">Step 3 — ${note} Names &amp; photos come from ServiceTitan; here you add what it doesn't store: <b>Title</b>, <b>DISC letter</b>, and a photo <i>only if</i> ServiceTitan has none. Tick <b>Show</b> for the ones to display on the leaderboard &amp; scorecards. Use the blank row at the bottom to add someone ServiceTitan doesn't have.</p>
+      <div class="tbl-scroll"><table class="tbl"><thead><tr><th>Show</th><th>Photo</th><th>Name</th><th>Title</th><th>DISC</th><th>Photo URL</th><th></th></tr></thead>
+      <tbody id="techBody">${merged.map(tr).join('')}${tr({st_tech_id:'',name:'',stPhoto:null,meta:{},synced:false})}</tbody></table></div>
       <div class="savemsg" id="techMsg" style="margin-top:10px"></div>`;
   }
   function techRowData(trEl){
     const g=f=>{ const el=trEl.querySelector(`[data-f="${f}"]`); return el?el.value.trim():''; };
     const chk=trEl.querySelector('[data-f="display"]');
-    return { id:trEl.dataset.id||null, location_id:currentLocId, name:g('name')||null, st_tech_id:g('st_tech_id')||null,
+    return { id:trEl.dataset.id||null, location_id:currentLocId, name:g('name')||null, st_tech_id:(trEl.dataset.st||'')||null,
              title:g('title')||null, disc:g('disc')||null, photo_url:g('photo_url')||null,
              display: chk?chk.checked:true, updated_at:new Date().toISOString() };
   }
