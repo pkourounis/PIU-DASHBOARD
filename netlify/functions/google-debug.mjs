@@ -2,7 +2,7 @@
 // total review count. Tries several query variants, and biases to the coordinates if provided.
 //   GET /api/google-debug/<tenant>?lat=40.7377599&lng=-73.7399525
 import { getConfig } from './_shared/config.mjs';
-import { placesSearchText } from './_shared/google.mjs';
+import { placesSearchText, placeDetails } from './_shared/google.mjs';
 
 export default async (req, context) => {
   const key = Netlify.env.get('GOOGLE_MAPS_API_KEY');
@@ -15,6 +15,14 @@ export default async (req, context) => {
   if (!t) return Response.json({ error: 'no tenant' });
 
   const url = new URL(req.url);
+  // If a Place ID is supplied, look it up directly (bypasses name search entirely).
+  const placeId = url.searchParams.get('placeId');
+  if (placeId) {
+    try {
+      const p = await placeDetails(key, placeId);
+      return Response.json({ tenant: t.name, placeId, resolved: { name: p.displayName?.text, address: p.formattedAddress, rating: p.rating ?? null, count: p.userRatingCount ?? null } });
+    } catch (e) { return Response.json({ tenant: t.name, placeId, error: String(e.message || e) }); }
+  }
   const lat = Number(url.searchParams.get('lat')), lng = Number(url.searchParams.get('lng'));
   const locationBias = Number.isFinite(lat) && Number.isFinite(lng)
     ? { circle: { center: { latitude: lat, longitude: lng }, radius: 30000 } } : undefined;
