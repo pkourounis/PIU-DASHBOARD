@@ -60,7 +60,9 @@ export function buildJobTechMap(assignments = []) {
 }
 
 
-function emptyDay() { return { opps: 0, wins: 0, salesUSD: 0, closedSalesUSD: 0, pipelineUSD: 0, revenueUSD: 0, cancels: 0, memberships: 0 }; }
+function emptyDay() { return { opps: 0, wins: 0, salesUSD: 0, closedSalesUSD: 0, pipelineUSD: 0, revenueUSD: 0, cancels: 0, memberships: 0, homeguard: 0, powerPartner: 0 }; }
+// Classify a membership by its plan name → 'homeguard' | 'powerPartner' | null (other).
+const membershipCategory = (name) => { const n = String(name || '').toLowerCase(); if (n.includes('homeguard')) return 'homeguard'; if (n.includes('power partner') || n.includes('powerpartner')) return 'powerPartner'; return null; };
 
 /** Fetch the raw entities for a window. Resilient: a failure in one endpoint (e.g. a missing
  *  scope) doesn't wipe the others — it's recorded in `errors`.
@@ -79,13 +81,14 @@ export async function fetchWindow(client, tenant, from, to) {
   // Jobs by COMPLETION date; invoices carry the "income items" that ServiceTitan counts as
   // revenue and uses to decide whether an opportunity converted (invoice subtotal ≥ threshold).
   // Appointments (by start date) feed the cancellations count; memberships feed memberships-sold.
-  const [estRes, jobRes, invRes, asgRes, apptRes, memRes] = await Promise.allSettled([
+  const [estRes, jobRes, invRes, asgRes, apptRes, memRes, mtypeRes] = await Promise.allSettled([
     client.estimates(tenant, { createdOnOrAfter: fromISO, createdBefore: toISO }),
     client.jobs(tenant, { completedOnOrAfter: fromISO, completedBefore: toISO }),
     client.invoices(tenant, { createdOnOrAfter: invFromISO, createdBefore: toISO }),
     client.assignments(tenant, { createdOnOrAfter: asgFromISO, createdBefore: toISO }),
     client.appointments(tenant, { startsOnOrAfter: fromISO, startsBefore: toISO }),
     client.memberships(tenant, { createdOnOrAfter: fromISO, createdBefore: toISO }),
+    client.membershipTypes(tenant, {}),   // plan definitions (id → name) for the HomeGuard/Power Partner split
   ]);
   const errors = {};
   const pick = (res, key) => (res.status === 'fulfilled' ? res.value : ((errors[key] = String(res.reason?.message || res.reason)), []));
@@ -95,6 +98,7 @@ export async function fetchWindow(client, tenant, from, to) {
   const assignments = pick(asgRes, 'assignments');
   const appointments = pick(apptRes, 'appointments');    // optional scope — absence just zeroes cancels
   const memberships = pick(memRes, 'memberships');        // optional scope — absence just zeroes memberships
+  const membershipTypes = pick(mtypeRes, 'membershipTypes');
 
   // Per-job technician split percentages drive split-adjusted Completed Revenue per tech. Fetched
   // by job id (in batches) because a split is set once and doesn't carry the job's completion date.
@@ -108,12 +112,12 @@ export async function fetchWindow(client, tenant, from, to) {
     }
   } catch (e) { errors.splits = String(e.message || e); }
 
-  return { estimates, jobs, invoices, assignments, appointments, memberships, splits, errors: Object.keys(errors).length ? errors : null };
+  return { estimates, jobs, invoices, assignments, appointments, memberships, membershipTypes, splits, errors: Object.keys(errors).length ? errors : null };
 }
 
 /** Build the per-day metric map from raw entities, on ServiceTitan's bases (see file header).
  *  Returns Map<'YYYY-MM-DD', metrics>. */
-export function buildDailyMap({ estimates, jobs, invoices, appointments, memberships }) {
+export function buildDailyMap({ estimates, jobs, invoices, appointments, memberships, membershipTypes }) {
   const map = new Map();
   const bump = (d) => { if (!map.has(d)) map.set(d, emptyDay()); return map.get(d); };
 
@@ -168,9 +172,15 @@ export function buildDailyMap({ estimates, jobs, invoices, appointments, members
     if (st !== 'canceled' && st !== 'cancelled') continue;
     const d = day(a.start ?? a.createdOn); if (d) bump(d).cancels += 1;
   }
-  // Memberships sold, on the sold/created day (field name varies by tenant — try the common ones).
+  // Memberships sold, on the sold/created day (memberships carry no soldOn — use createdOn/from),
+  // split into HomeGuard vs Power Partner by the plan name.
+  const planName = {};
+  for (const mt of (membershipTypes || [])) planName[mt.id] = mt.name || '';
   for (const m of (memberships || [])) {
-    const d = day(m.soldOn ?? m.from ?? m.createdOn ?? m.activeOn); if (d) bump(d).memberships += 1;
+    const d = day(m.soldOn ?? m.createdOn ?? m.from ?? m.activeOn); if (!d) continue;
+    const b = bump(d); b.memberships += 1;
+    const cat = membershipCategory(planName[m.membershipTypeId ?? m.membershipType?.id ?? m.typeId]);
+    if (cat) b[cat] += 1;
   }
   return map;
 }

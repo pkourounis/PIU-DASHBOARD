@@ -116,12 +116,19 @@ export function startMockST(port = 8899) {
     res.json(page(rows, req.query));
   });
 
-  // Memberships feed the memberships-sold count. ~1 sold on roughly half of days.
+  // Membership plan definitions — used to split memberships-sold into HomeGuard vs Power Partner.
+  app.get('/memberships/v2/tenant/:t/membership-types', (req, res) => {
+    res.json(page([
+      { id: 11, name: 'HomeGuard Annual Membership', active: true },
+      { id: 22, name: 'Power Partner Essentials Membership', active: true },
+    ], req.query));
+  });
+  // Memberships feed the memberships-sold count. ~1 sold on roughly half of days, alternating plan.
   app.get('/memberships/v2/tenant/:t/memberships', (req, res) => {
     const rows = [];
     eachDay(req.query.createdOnOrAfter, req.query.createdBefore, (t) => {
       const r = seed(req.params.t + 'mem' + t.toISOString().slice(0, 10));
-      if (r() < 0.5) rows.push({ id: 700000000 + Math.round(t.getTime() / 86400000), soldOn: t.toISOString(), status: { name: 'Active' } });
+      if (r() < 0.5) rows.push({ id: 700000000 + Math.round(t.getTime() / 86400000), soldOn: t.toISOString(), status: { name: 'Active' }, membershipTypeId: r() < 0.5 ? 11 : 22 });
     });
     res.json(page(rows, req.query));
   });

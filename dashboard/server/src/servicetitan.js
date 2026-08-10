@@ -80,6 +80,9 @@ export class ServiceTitanClient {
   // Appointments (for the cancellations count) and memberships (for memberships sold).
   appointments(tenant, q)  { return this.getAll(tenant, `/jpm/v2/tenant/${tenant.tenantId}/appointments`, q); }
   memberships(tenant, q)   { return this.getAll(tenant, `/memberships/v2/tenant/${tenant.tenantId}/memberships`, q); }
+  // Membership plan definitions (id → name) so memberships-sold can be split into HomeGuard vs
+  // Power Partner by matching the plan name.
+  membershipTypes(tenant, q) { return this.getAll(tenant, `/memberships/v2/tenant/${tenant.tenantId}/membership-types`, q); }
   // Per-job technician split percentages (payroll). This is how ServiceTitan attributes a shared
   // job's Completed Revenue across techs ("split-adjusted"): each row is { jobId, technicianId, split }.
   jobSplits(tenant, q)     { return this.getAll(tenant, `/payroll/v2/tenant/${tenant.tenantId}/jobs/splits`, q); }

@@ -101,6 +101,11 @@ assert.ok(Array.isArray(locs) && locs[0].tenant === '9999999999', '/api/location
 assert.ok(!('clientSecret' in locs[0]), 'no secrets leaked in /api/locations');
 const daily = await (await fetch(`${base}/api/locations/9999999999/daily`)).json();
 assert.ok(Array.isArray(daily) && 'revenueUSD' in daily[0], '/api/daily ok');
+// Memberships split into HomeGuard + Power Partner; the two plans sum to total memberships sold.
+const mem = daily.reduce((a, d) => { a.total += d.memberships || 0; a.hg += d.homeguard || 0; a.pp += d.powerPartner || 0; return a; }, { total: 0, hg: 0, pp: 0 });
+assert.ok(mem.total > 0, `memberships sold (${mem.total})`);
+assert.ok(mem.hg > 0 && mem.pp > 0, `both plans present (HomeGuard ${mem.hg}, Power Partner ${mem.pp})`);
+assert.equal(mem.hg + mem.pp, mem.total, `HomeGuard + Power Partner == total memberships (${mem.hg}+${mem.pp} vs ${mem.total})`);
 
 listener.close(); srv.close();
 console.log(`✓ pipeline OK — ${series.length} days, totals: opps=${tot.opps} wins=${tot.wins} rev=$${Math.round(tot.rev).toLocaleString()} sales=$${Math.round(tot.sales).toLocaleString()}, ${techs.length} techs`);

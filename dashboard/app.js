@@ -74,7 +74,7 @@
 
   // ===================== KPI Adapter (ServiceTitan / sample) ============
   const Adapter = {
-    live:false, apiBase:'', techDaily:new Map(),
+    live:false, apiBase:'', techDaily:new Map(), daily:new Map(),
     async init(){
       this.apiBase = String(CFG.apiBase!=null?CFG.apiBase:'').replace(/\/$/,'');
       try{ const h=await fetch(this.apiBase+'/api/health',{cache:'no-store'});
@@ -86,9 +86,18 @@
         if(Array.isArray(locs)) await Promise.all(locs.map(async l=>{
           try{ const td=await (await fetch(`${this.apiBase}/api/locations/${l.tenant}/tech-daily`)).json();
             if(td&&td.daily&&Object.keys(td.daily).length) this.techDaily.set(String(l.tenant),td); }catch(_){}
+          try{ const d=await (await fetch(`${this.apiBase}/api/locations/${l.tenant}/daily`)).json();
+            if(Array.isArray(d)) this.daily.set(String(l.tenant),d); }catch(_){}
         })); }catch(_){}
     },
   };
+  // Sum location-level daily metrics (memberships, etc.) over the selected date range.
+  function sumDaily(stTenant, keys){
+    const arr=Adapter.daily.get(String(stTenant)); if(!arr) return null;
+    const [from,to]=rangeBounds(range); const acc={}; keys.forEach(k=>acc[k]=0);
+    for(const row of arr){ const t=row.t; if(!t||t<from||t>to) continue; keys.forEach(k=>acc[k]+=row[k]||0); }
+    return acc;
+  }
   function computeTechsLive(stTenant){
     const td=Adapter.techDaily.get(String(stTenant)); if(!td) return null;
     const [from,to]=rangeBounds(range); const tot={};
@@ -114,7 +123,7 @@
       return {...t, title:m.title||t.title, disc:m.disc||t.disc, photo:m.photo_url||t.photo, _hidden:(m.display===false)}; })
       .filter(t=>!t._hidden);   // technicians unticked in admin are hidden from the board
   }
-  function buildLocation(name, ov, live){
+  function buildLocation(name, ov, live, md){
     const g = ov && ov.goals;
     const totRev=techs.reduce((a,t)=>a+t.revenue,0), totOpps=techs.reduce((a,t)=>a+t.opps,0), totConv=techs.reduce((a,t)=>a+t.converted,0);
     const closeActual = totOpps?totConv/totOpps:0;
@@ -124,8 +133,8 @@
       goals:{
         revenue:{ actual: live?totRev:SAMPLE_GOALS.revenue.actual, target: g?Number(g.revenue_target):SAMPLE_GOALS.revenue.target, period: g?g.revenue_period:'monthly' },
         close:{ actual: live?closeActual:SAMPLE_GOALS.close.actual, target: g?Number(g.close_rate_target):SAMPLE_GOALS.close.target },
-        homeguard:{ actual: live?null:SAMPLE_GOALS.homeguard.actual, target: g?Number(g.homeguard_target):SAMPLE_GOALS.homeguard.target },
-        powerPartner:{ actual: live?null:SAMPLE_GOALS.powerPartner.actual, target: g?Number(g.power_partner_target):SAMPLE_GOALS.powerPartner.target },
+        homeguard:{ actual: live?(md?md.homeguard:0):SAMPLE_GOALS.homeguard.actual, target: g?Number(g.homeguard_target):SAMPLE_GOALS.homeguard.target },
+        powerPartner:{ actual: live?(md?md.powerPartner:0):SAMPLE_GOALS.powerPartner.actual, target: g?Number(g.power_partner_target):SAMPLE_GOALS.powerPartner.target },
         membershipsPeriod: g?g.memberships_period:'annual',
         reviews:{ actual: live?null:SAMPLE_GOALS.reviews.actual, target: g?Number(g.reviews_target):SAMPLE_GOALS.reviews.target,
                   rating: live?null:SAMPLE_GOALS.reviews.rating, total: live?null:SAMPLE_GOALS.reviews.total, period: g?g.reviews_period:'monthly' } },
@@ -141,7 +150,8 @@
       const base = liveRows || SAMPLE_TECHS.map(t=>({...t}));
       techs = applyOverlayMeta(base, ov);
       computeTeamAvg();
-      buildLocation(loc.name, ov, !!liveRows);
+      const md = (Adapter.live && loc.stTenant) ? sumDaily(loc.stTenant,['homeguard','powerPartner','memberships']) : null;
+      buildLocation(loc.name, ov, !!liveRows, md);
     } else {
       techs = SAMPLE_TECHS.map(t=>({...t}));
       computeTeamAvg();
