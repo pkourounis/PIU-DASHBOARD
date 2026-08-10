@@ -202,23 +202,46 @@
       renderTechs(locations.find(l=>l.id===currentLocId));
     }catch(e){ msg.textContent=(e&&e.message)||'Save failed'; msg.style.color='var(--bad)'; }
   }
+  // Normalize any image to a centered, upright square before storing: decode with EXIF
+  // orientation applied (so sideways phone photos come out upright), center-crop to a square,
+  // and re-encode as JPEG (which strips EXIF). Guarantees the avatar always fills the circle
+  // correctly regardless of the source aspect ratio or camera rotation.
+  async function squareOriented(file, size){
+    size=size||512;
+    let src, w, h;
+    try{ src=await createImageBitmap(file,{imageOrientation:'from-image'}); w=src.width; h=src.height; }
+    catch(_){ // older browsers: <img> honors EXIF orientation on render, so drawing it is upright too
+      src=await new Promise((res,rej)=>{ const im=new Image(); im.onload=()=>res(im); im.onerror=()=>rej(new Error('decode')); im.src=URL.createObjectURL(file); });
+      w=src.naturalWidth; h=src.naturalHeight;
+    }
+    if(!w||!h) throw new Error('no dimensions');
+    const s=Math.min(w,h), sx=(w-s)/2, sy=(h-s)/2;
+    const c=document.createElement('canvas'); c.width=size; c.height=size;
+    const ctx=c.getContext('2d'); ctx.imageSmoothingEnabled=true; ctx.imageSmoothingQuality='high';
+    ctx.drawImage(src, sx, sy, s, s, 0, 0, size, size);
+    if(src.close) src.close();
+    return await new Promise((res,rej)=>c.toBlob(b=>b?res(b):rej(new Error('encode')),'image/jpeg',0.9));
+  }
   // Upload a photo to Supabase Storage and drop its public URL into the row's Photo URL field.
   function uploadPhoto(btn){
     const trEl=btn.closest('tr'); if(!trEl) return; const msg=$("#techMsg");
     const inp=document.createElement('input'); inp.type='file'; inp.accept='image/*';
     inp.onchange=async()=>{
       const file=inp.files&&inp.files[0]; if(!file) return;
-      if(file.size>5*1024*1024){ msg.textContent='Image too large — max 5 MB'; msg.style.color='var(--bad)'; return; }
-      msg.textContent='Uploading photo…'; msg.style.color='var(--ink-3)';
-      const ext=((file.name.split('.').pop()||'jpg').toLowerCase().replace(/[^a-z0-9]/g,''))||'jpg';
+      if(file.size>15*1024*1024){ msg.textContent='Image too large — max 15 MB'; msg.style.color='var(--bad)'; return; }
+      msg.textContent='Processing photo…'; msg.style.color='var(--ink-3)';
+      let body, ext, ctype;
+      try{ body=await squareOriented(file,512); ext='jpg'; ctype='image/jpeg'; }
+      catch(_){ body=file; ext=((file.name.split('.').pop()||'jpg').toLowerCase().replace(/[^a-z0-9]/g,''))||'jpg'; ctype=file.type||'image/jpeg'; }
+      msg.textContent='Uploading photo…';
       const who=(trEl.dataset.st||'manual').replace(/[^a-zA-Z0-9_-]/g,'')||'manual';
       const path=`${currentLocId}/${who}-${Date.now()}.${ext}`;
-      const up=await SB.storage.from('tech-photos').upload(path,file,{upsert:true,contentType:file.type||'image/jpeg'});
+      const up=await SB.storage.from('tech-photos').upload(path,body,{upsert:true,contentType:ctype});
       if(up.error){ msg.textContent='Upload failed: '+up.error.message; msg.style.color='var(--bad)'; return; }
       const url=(SB.storage.from('tech-photos').getPublicUrl(path).data||{}).publicUrl;
       if(!url){ msg.textContent='Uploaded, but no public URL returned'; msg.style.color='var(--bad)'; return; }
       const field=trEl.querySelector('[data-f="photo_url"]'); if(field) field.value=url;
-      const cell=trEl.children[1]; if(cell) cell.innerHTML=`<img src="${esc(url)}" alt="" style="width:34px;height:34px;border-radius:50%;object-fit:cover">`;
+      const cell=trEl.children[1]; if(cell) cell.innerHTML=`<img src="${esc(url)}" alt="" style="width:34px;height:34px;border-radius:50%;object-fit:cover;object-position:center">`;
       msg.textContent='Photo uploaded ✓ — click “Save all changes” to keep it.'; msg.style.color='var(--good)';
     };
     inp.click();
