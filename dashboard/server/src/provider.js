@@ -233,10 +233,11 @@ export function buildTechDaily({ estimates, appointments, assignments, jobs, inv
     rec.hours += ap.hours;
     if (ap.jobId != null) rec.jobSet.add(ap.jobId);
   }
-  // All technicians assigned to each job. A shared job credits EACH assigned tech the FULL
-  // completed revenue (no split) — the same "no split" rule labor hours use above, and how
-  // ServiceTitan's per-technician scorecards attribute it. Crediting only one tech (e.g. the
-  // earliest assignment) zeroes out every co-tech on a shared job.
+  // All technicians assigned to each job. ServiceTitan SPLITS a completed job's revenue across
+  // the techs who ran it ("adjusted by technician split"), so the per-tech revenues sum exactly
+  // to the location's Completed Revenue. We split equally by head count (ServiceTitan's default);
+  // custom per-job split percentages aren't exposed on the assignment feed. NOTE: this is the
+  // revenue rule only — labor hours above credit each assigned tech the FULL duration (no split).
   const jobTechs = new Map();   // jobId -> Set(techId)
   const asgName = {};
   for (const asg of (assignments || [])) {
@@ -262,9 +263,10 @@ export function buildTechDaily({ estimates, appointments, assignments, jobs, inv
     const cod = day(j.completedOn); if (!cod) continue;
     const set = jobTechs.get(jobId);
     const ids = (set && set.size) ? [...set] : [jt.get(jobId)?.id ?? null];   // fall back to jobTech, else unassigned
+    const share = invSub / ids.length;   // split the job's revenue equally across the techs who ran it
     for (const id of ids) {
       ensureRoster(id, asgName[id] || jt.get(jobId)?.name);
-      getRec(getDay(cod), id).completedRev += invSub;
+      getRec(getDay(cod), id).completedRev += share;
     }
   }
   const out = {};
