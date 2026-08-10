@@ -279,6 +279,7 @@
         <div class="field"><label>Client id</label><input id="c_cid" placeholder="cid.xxxxx"></div>
         <div class="field"><label>Client secret</label><input id="c_secret" type="password" placeholder="cs1.xxxxx"></div>
         <div class="field"><label>App key (ST-App-Key)</label><input id="c_appkey" type="password" placeholder="ak1.xxxxx"><span class="hint">From your ServiceTitan app registration. Same value ServiceTitan sends in the "ST-App-Key" header.</span></div>
+        <div class="field"><label>GoHighLevel API token</label><input id="c_ghlkey" type="password" placeholder="pit-xxxxx"><span class="hint">A GoHighLevel <b>Private Integration Token</b> for this location's sub-account (needs the reviews / reputation scope). Used to pull the Google review rating &amp; count.</span></div>
       </div>
       <div class="row-actions"><button class="btn" data-action="saveCreds">Save credentials</button><span class="savemsg" id="credMsg"></span></div>
       <hr style="border:0;border-top:1px solid var(--border);margin:22px 0">
@@ -306,11 +307,11 @@
     view='location'; tab='conn'; render();
   }
   async function saveCreds(){
-    const cid=$("#c_cid").value.trim(), secret=$("#c_secret").value.trim(), appkey=$("#c_appkey").value.trim();
-    const msg=$("#credMsg"); if(!cid && !secret && !appkey){ msg.textContent='Enter a client id, secret and app key'; msg.style.color='var(--bad)'; return; }
+    const cid=$("#c_cid").value.trim(), secret=$("#c_secret").value.trim(), appkey=$("#c_appkey").value.trim(), ghlkey=$("#c_ghlkey").value.trim();
+    const msg=$("#credMsg"); if(!cid && !secret && !appkey && !ghlkey){ msg.textContent='Enter a client id, secret and app key'; msg.style.color='var(--bad)'; return; }
     msg.textContent='Saving…'; msg.style.color='var(--ink-3)';
-    const {error}=await SB.rpc('save_location_credentials',{p_location_id:currentLocId,p_client_id:cid,p_client_secret:secret,p_app_key:appkey});
-    if(error){ msg.textContent=error.message; msg.style.color='var(--bad)'; } else { $("#c_cid").value=''; $("#c_secret").value=''; $("#c_appkey").value=''; renderLocation(); }
+    const {error}=await SB.rpc('save_location_credentials',{p_location_id:currentLocId,p_client_id:cid,p_client_secret:secret,p_app_key:appkey,p_ghl_api_key:ghlkey});
+    if(error){ msg.textContent=error.message; msg.style.color='var(--bad)'; } else { $("#c_cid").value=''; $("#c_secret").value=''; $("#c_appkey").value=''; $("#c_ghlkey").value=''; renderLocation(); }
   }
   // Kick off the backend sync (Netlify background function) and watch the stored data land.
   async function syncNow(){

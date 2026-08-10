@@ -27,6 +27,7 @@ function mapTenants(rows) {
       name: l.name, code: l.code, region: l.region, market: l.market, state: l.state,
       tenantId: String(l.st_tenant_id), clientId: l.st_client_id, clientSecret: l.st_client_secret,
       appKey, env: l.st_env || 'production',
+      ghlLocationId: l.ghl_location_id || null, ghlApiKey: l.ghl_api_key || null,   // GoHighLevel (Google reviews)
     });
   }
   return tenants;
@@ -59,8 +60,8 @@ async function tenantsViaServiceRole(url) {
   const h = { apikey: key, Authorization: `Bearer ${key}` };
   try {
     const [locsRes, credsRes] = await Promise.all([
-      fetch(`${url}/rest/v1/locations?select=id,name,code,region,market,state,st_tenant_id,st_env,is_active&is_active=eq.true`, { headers: h }),
-      fetch(`${url}/rest/v1/location_credentials?select=location_id,st_client_id,st_client_secret,st_app_key`, { headers: h }),
+      fetch(`${url}/rest/v1/locations?select=id,name,code,region,market,state,st_tenant_id,st_env,ghl_location_id,is_active&is_active=eq.true`, { headers: h }),
+      fetch(`${url}/rest/v1/location_credentials?select=location_id,st_client_id,st_client_secret,st_app_key,ghl_api_key`, { headers: h }),
     ]);
     if (!locsRes.ok) return null;
     const locs = await locsRes.json();
