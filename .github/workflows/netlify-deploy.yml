@@ -22,6 +22,20 @@ jobs:
       # at runtime and every function that reads/writes Blobs crashes ("status code 0").
       - name: Install dependencies
         run: npm install --no-audit --no-fund
+      # Push server-only secrets to Netlify so the functions can read them at runtime. Sourced
+      # from GitHub repo secrets (never committed). Skips cleanly if a secret isn't configured.
+      - name: Sync Netlify environment variables
+        run: |
+          if [ -n "$SYNC_TENANTS_SECRET" ]; then
+            npx --yes netlify-cli@17 env:set SYNC_TENANTS_SECRET "$SYNC_TENANTS_SECRET" --force
+            echo "Set SYNC_TENANTS_SECRET on Netlify."
+          else
+            echo "GitHub secret SYNC_TENANTS_SECRET is not set; skipping (backend will see zero tenants)."
+          fi
+        env:
+          NETLIFY_SITE_ID: db7735aa-68ed-403d-9443-d8ca15fd1b1f
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          SYNC_TENANTS_SECRET: ${{ secrets.SYNC_TENANTS_SECRET }}
       # --skip-functions-cache forces a fresh bundle every deploy. The cache does not reliably
       # invalidate when a shared module (netlify/functions/_shared/*.mjs) changes, which would
       # otherwise leave stale function code deployed after a provider/config edit.
