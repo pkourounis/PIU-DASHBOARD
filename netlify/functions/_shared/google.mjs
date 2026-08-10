@@ -3,7 +3,9 @@
 const PLACES = 'https://places.googleapis.com/v1';
 
 // Find a place by free-text (business name + city/region). Returns the top match with rating/count.
-export async function placesSearchText(key, textQuery) {
+export async function placesSearchText(key, textQuery, { locationBias } = {}) {
+  const body = { textQuery, maxResultCount: 5 };
+  if (locationBias) body.locationBias = locationBias;
   const res = await fetch(`${PLACES}/places:searchText`, {
     method: 'POST',
     headers: {
@@ -11,7 +13,7 @@ export async function placesSearchText(key, textQuery) {
       'X-Goog-Api-Key': key,
       'X-Goog-FieldMask': 'places.id,places.displayName,places.formattedAddress,places.rating,places.userRatingCount',
     },
-    body: JSON.stringify({ textQuery, maxResultCount: 5 }),
+    body: JSON.stringify(body),
   });
   if (!res.ok) throw new Error(`Places searchText failed (${res.status}): ${await res.text()}`);
   return res.json();
