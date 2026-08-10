@@ -9,3 +9,15 @@
 [functions]
   node_bundler = "esbuild"
   directory = "netlify/functions"
+
+# Always revalidate the app shell + scripts so a new deploy is picked up on the next normal
+# reload — no hard-refresh needed. Without this, browsers cache admin.js/app.js across deploys
+# and can run stale code (e.g. an old photo uploader that skips image normalization).
+[[headers]]
+  for = "/*.html"
+  [headers.values]
+    Cache-Control = "no-cache"
+[[headers]]
+  for = "/*.js"
+  [headers.values]
+    Cache-Control = "no-cache"
